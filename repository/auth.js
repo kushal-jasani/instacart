@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const db=require('../util/database');
 
 const findUser=async(key)=>{
@@ -23,4 +24,34 @@ const insertUser=async(email,
     }
 }
 
-module.exports={findUser,insertUser}
+const addTokenToUser = async (resettoken, resettokenexpiry, email) => {
+    return await db.query(
+      "update users set resettoken=?,resettokenexpiry=? where email=?",
+      [resettoken, resettokenexpiry, email]
+    );
+  };
+
+const updatePasswordAndToken = async (hashedNewPassword, userId) => {
+    return await db.query(
+      "update users set password=?,resettoken=NULL where id=?",
+      [hashedNewPassword, userId]
+    );
+  };
+
+  const generateToken = (length, expiryhours) => {
+    return new Promise((resolve, reject) => {
+      crypto.randomBytes(length, async (err, buf) => {
+        if (err) {
+          reject(err);
+        } else {
+          const resettoken = buf.toString("hex");
+          const resettokenexpiry = new Date(
+            Date.now() + expiryhours * 3600 * 1000
+          );
+          resolve({ resettoken, resettokenexpiry });
+        }
+      });
+    });
+  };
+
+module.exports={findUser,insertUser,addTokenToUser,updatePasswordAndToken,generateToken}
