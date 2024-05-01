@@ -4,6 +4,7 @@ const bodyparser = require("body-parser");
 require("dotenv").config();
 
 const authRoutes=require('./routes/auth')
+const userRoutes=require('./routes/user');
 
 app.use(bodyparser.json());
 app.use((req, res, next) => {
@@ -14,5 +15,7 @@ app.use((req, res, next) => {
 });
 
 app.use(authRoutes);
+app.use('/userprofile',userRoutes);
+
 
 app.listen(process.env.PORT);
