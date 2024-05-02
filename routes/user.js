@@ -9,6 +9,7 @@ router.post('/changename',isAuth,userController.postChangeName);
 
 router.post('/changephonenumber',isAuth,userController.postChangePhoneNumber);
 router.post('/verifychangedphonenumber',isAuth,userController.verifyChangedPhoneNumber);
+router.get('/information',isAuth,userController.userInformation);
 
 
 module.exports=router;

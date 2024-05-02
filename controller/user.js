@@ -4,6 +4,7 @@ const otpless = require("otpless-node-js-auth-sdk");
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 const { findUser } = require("../repository/auth");
 const { findPasswordOfUser, updateUser } = require("../repository/user");
+const { changeEmailSchema, changePasswordSchema, changeNameSchema, changePhoneNumberSchema } = require("../helper/user_section_schema");
 const clientId = process.env.OTPLESS_CLIENTID;
 const clientSecret = process.env.OTPLESS_CLIETSECRET;
 
@@ -13,6 +14,21 @@ exports.changeEmail = async (req, res, next) => {
     const userId = req.user.userId;
 
     let updatedField = {};
+
+
+    const { error } = changeEmailSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
 
     if (updatedEmail !== confirmEmail) {
       return sendHttpResponse(
@@ -99,24 +115,25 @@ exports.changeEmail = async (req, res, next) => {
 
 exports.postChangePassword = async (req, res, next) => {
   try {
-    // const { error } = changePasswordSchema.validate(req.body);
-    // if (error) {
-    //   return sendHttpResponse(
-    //     req,
-    //     res,
-    //     next,
-    //     generateResponse({
-    //       status: "error",
-    //       statusCode: 400,
-    //       msg: error.details[0].message,
-    //     })
-    //   );
-    // }
     const newPassword = req.body.newPassword;
     const confirmNewPassword = req.body.confirmNewPassword;
     const userId = req.user.userId;
     let updatedField = {};
 
+    const { error } = changePasswordSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+   
     if (newPassword !== confirmNewPassword) {
       return sendHttpResponse(
         req,
@@ -163,19 +180,19 @@ exports.postChangeName = async (req, res, next) => {
     const userId = req.user.userId;
     let updatedFields = {};
 
-    // const { error } = changePasswordSchema.validate(req.body);
-    // if (error) {
-    //   return sendHttpResponse(
-    //     req,
-    //     res,
-    //     next,
-    //     generateResponse({
-    //       status: "error",
-    //       statusCode: 400,
-    //       msg: error.details[0].message,
-    //     })
-    //   );
-    // }
+    const { error } = changeNameSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
 
     if (firstName) {
       updatedFields["first_name"] = firstName;
@@ -215,8 +232,24 @@ exports.postChangePhoneNumber = async (req, res, next) => {
   try {
     const { country_code, phoneno, action } = req.body;
     const userId = req.user.userId;
-    const [isRegistered] = await findUser({ phoneno:phoneno});
-    if (isRegistered.length>0 && isRegistered[0].id === userId) {
+
+    const { error } = changePhoneNumberSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
+
+    const [isRegistered] = await findUser({ phoneno: phoneno });
+    if (isRegistered.length > 0 && isRegistered[0].id === userId) {
       return sendHttpResponse(
         req,
         res,
@@ -227,7 +260,7 @@ exports.postChangePhoneNumber = async (req, res, next) => {
           msg: `The provided phone number ${phoneno} is already registered by you. To update, please enter a different number.☹️`,
         })
       );
-    } else if (isRegistered.length>0) {
+    } else if (isRegistered.length > 0) {
       return sendHttpResponse(
         req,
         res,
@@ -318,7 +351,7 @@ exports.postChangePhoneNumber = async (req, res, next) => {
 exports.verifyChangedPhoneNumber = async (req, res, next) => {
   try {
     const { country_code, phoneno, otpid, enteredotp } = req.body;
-    const userId=req.user.userId;
+    const userId = req.user.userId;
 
     const phonewithcountrycode = country_code + phoneno;
 
@@ -384,6 +417,68 @@ exports.verifyChangedPhoneNumber = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "internal server error when changing phone number👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.userInformation = async (req, res, next) => {
+  try {
+
+    const userId = req.user.userId;
+    const [userResults] = await findUser({ id: userId });
+    if (!userResults || userResults.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "No user found",
+        })
+      );
+    }
+    const { first_name, last_name, email, country_code, phoneno, is_verify } =
+      userResults[0];
+
+    const userData = {
+      email: email,
+      firstName: first_name,
+      lastName: last_name,
+      country_code: country_code,
+      phoneno: phoneno,
+    };
+
+    if(phoneno){
+      userData.is_verify=is_verify,
+      userData.phoneNumberStatus = is_verify === 1 ? "verified" : "unverified",
+      userData.phoneNumberStatusMessage=is_verify === 1
+          ? "Your phone number is verified"
+          : "Unverified. Verify your number to secure your account."
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 200,
+        status: "success",
+        data: { userData },
+        msg: "User data retrived successfully✅",
+      })
+    );
+  } catch (error) {
+    console.log("error while changing Name", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error when fetching user information👨🏻‍🔧",
       })
     );
   }

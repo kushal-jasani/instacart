@@ -14,13 +14,14 @@ const findUser=async(key)=>{
 const insertUser=async(email,
     country_code,
     phoneno,
+    is_verify,
     hashedPassword)=>{
     if(email){
         const firstName = email.substring(0, email.indexOf('@'));
         return await db.query('INSERT INTO users SET ?',{first_name:firstName,email:email,password:hashedPassword})
     }
     else{
-        return await db.query('INSERT INTO users SET ?',{country_code:country_code,phoneno:phoneno,password:hashedPassword})
+        return await db.query('INSERT INTO users SET ?',{country_code:country_code,phoneno:phoneno,is_verify:is_verify,password:hashedPassword})
     }
 }
 
