@@ -510,7 +510,7 @@ exports.refreshAccessToken = async (req, res, next) => {
         res,
         next,
         generateResponse({
-          statusCode: 401,
+          statusCode: 403,
           status: "error",
           msg: "Refresh token has expired⏳",
         })
