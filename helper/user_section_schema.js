@@ -1,7 +1,9 @@
 const Joi = require("joi");
 
 const changeEmailSchema = Joi.object({
-  email: Joi.string().email().lowercase().required(),
+  updatedEmail: Joi.string().email().lowercase().required(),
+  confirmEmail: Joi.string().email().lowercase().required(),
+  password: Joi.string().min(8).required(),
 });
 
 const changePasswordSchema = Joi.object({
