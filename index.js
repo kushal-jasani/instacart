@@ -5,6 +5,8 @@ require("dotenv").config();
 
 const authRoutes=require('./routes/auth')
 const userRoutes=require('./routes/user');
+const storeRoutes=require('./routes/store')
+
 
 app.use(bodyparser.json());
 app.use((req, res, next) => {
@@ -16,6 +18,7 @@ app.use((req, res, next) => {
 
 app.use(authRoutes);
 app.use('/userprofile',userRoutes);
+app.use('/store',storeRoutes);
 
 
 app.listen(process.env.PORT);
