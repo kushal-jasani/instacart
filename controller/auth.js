@@ -173,6 +173,34 @@ exports.varifyOtpRegister = async (req, res, next) => {
           })
         );
       }
+      let isEmail = email !== undefined;
+      const [userResults] = await findUser(
+      isEmail ? { email } : { phoneno: phoneno }
+    );
+    if (isEmail && userResults.length > 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "User with given email number already exists👀",
+        })
+      );
+    }
+    if (!isEmail && userResults.length > 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "User with given phone number already exists👀",
+        })
+      );
+    }
     const phonewithcountrycode = country_code + phoneno;
 
     const varificationresponse = await otpless.verifyOTP(
