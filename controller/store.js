@@ -61,7 +61,7 @@ exports.categoryFilter=async(req,res,next)=>{
 exports.getStoresByCategory=async(req,res,next)=>{
     try{
         let { main_category_id } = req.query;
-        main_category_id=main_category_id>11 ? "1":main_category_id;
+        main_category_id=main_category_id>14 ? "1":main_category_id;
         let stores;
         if (main_category_id === '1') {
             [stores] = await getAllStores();
@@ -167,7 +167,26 @@ exports.getStoresByCategory=async(req,res,next)=>{
             generateResponse({
                 status: "error",
                 statusCode: 500,
-                msg: "Internal server error",
+                msg: "Internal server error while fetching stores👨🏻‍🔧",
+            })
+        );
+    }
+}
+
+exports.getStoreDetailsFront=async(req,res,next)=>{
+    try{
+
+    }
+    catch(error){
+        console.log("Error while fetching store front detail: ", error);
+        return sendHttpResponse(
+            req,
+            res,
+            next,
+            generateResponse({
+                status: "error",
+                statusCode: 500,
+                msg: "Internal server error while fetching store front detail👨🏻‍🔧",
             })
         );
     }
