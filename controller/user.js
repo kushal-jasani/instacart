@@ -276,7 +276,7 @@ exports.postChangePhoneNumber = async (req, res, next) => {
 
     let updatedFields = {};
 
-    updatedFields["country_code"] = phoneno;
+    updatedFields["country_code"] = country_code;
     updatedFields["phoneno"] = phoneno;
 
     if (action == "change") {
