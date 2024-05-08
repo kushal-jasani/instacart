@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+const passport=require('passport');
+const GoogleStrategy = require('passport-google-oauth2').Strategy;
+const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
+
+
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 const otpless = require("otpless-node-js-auth-sdk");
@@ -16,6 +21,128 @@ const {
 } = require("../util/jwt");
 const { findUser, insertUser, updatePasswordAndToken, addTokenToUser, generateToken } = require("../repository/auth");
 const { resetPasswordSchema, sendOtpRegisterSchema, verifyOtpRegisterSchema, loginSchema, verifyLoginSchema, refreshAccessTokenSchema, postResetPasswordSchema } = require("../helper/validation_schema");
+
+
+
+const jwtOptions = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET // Replace this with your JWT secret key
+};
+
+passport.use(new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
+  try {
+    // Find the user based on JWT payload
+    const user = await findUser(jwtPayload.id);
+
+    if (user) {
+      return done(null, user);
+    } else {
+      return done(null, false);
+    }
+  } catch (error) {
+    return done(error, false);
+  }
+}));
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_AUTH_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
+  callbackURL: "http://localhost:8080/auth/google/callback"
+},async (accessToken, refreshToken, profile, done) => {
+  try {
+    console.log('hello')
+    console.log(profile)
+    let email;
+    let [user] = await findUser({ email: profile.emails[0].value }); 
+// Check if user already exists
+    if (!user || user.length==0) {
+      // User doesn't exist, create a new user
+      // const newUser = {
+      //   // googleId: profile.id,
+      //   // displayName: profile.displayName,
+      //   email: profile.emails[0].value // Assuming you want to store the user's email
+      //   // Add other user data as needed
+      // };
+
+      email=profile.emails[0].value // Assuming you want to store the user's email
+      let country_code,phoneno,hashedPassword;
+      [user] = await insertUser(email,country_code,phoneno,hashedPassword); 
+      console.log(user)// Insert new user into database
+    }
+    done(null, user); // Return user object
+  } catch (error) {
+    done(error);
+  }
+}));
+
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser(async (email, done) => {
+  try {
+    const [user] = await findUser({email:email});// Replace with your function to find user by ID
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
+});
+
+// Example route handler for login/register with Google OAuth
+exports.loginOrRegisterWithGoogle = async (req, res, next) => {
+  try {
+    console.log(req)
+    console.log('heeeeeeellllo')
+    // If user is authenticated (already logged in), redirect to home page or dashboard
+    if (req.isAuthenticated()) {
+      return res.redirect('/');
+    }
+
+    // Check if the user is found in the request object after successful Google OAuth authentication
+    if (!req.user) {
+      // User not found in request object, return error or redirect to login page
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          statusCode: 401,
+          status: "error",
+          msg: "User not authenticated",
+        })
+      );
+      
+    }
+
+    // User is authenticated, you can generate JWT tokens or set up sessions here
+    const accessToken = generateAccessToken(req.user.id);
+    const refreshToken = generateRefreshToken(req.user.id);
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 201,
+        status: "success",
+        data: {
+          JWTToken: { accessToken, refreshToken },
+        },
+        msg: "User registerd successfully✅",
+      })
+    );
+    
+    // Optionally, you can redirect the user to a specific page after successful login/register
+    // res.redirect('/store'); // Change '/dashboard' to your desired redirect URL
+  } catch (error) {
+    // Handle errors
+    console.error('Error in loginOrRegisterWithGoogle:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
 
 exports.sendOtpRegister = async (req, res, next) => {
   try {
@@ -328,7 +455,7 @@ exports.login=async(req,res,next)=>{
     }
     else{
       [user] = await findUser({ phoneno });
-      if (!user) {
+      if (!user || user.length==0) {
         return sendHttpResponse(
           req,
           res,
@@ -435,7 +562,7 @@ exports.verifyOtpLogin=async(req,res,next)=>{
     const phonewithcountrycode = country_code + phoneno;
 
     const [user] = await findUser({ phoneno });
-    if (!user) {
+    if (!user || user.length==0) {
       return sendHttpResponse(
         req,
         res,
@@ -666,8 +793,7 @@ exports.resetPasswordLink = async (req, res, next) => {
       tokenlength,
       expiryhours
     );
-    // console.log(resettoken);
-    // console.log(resettokenexpiry);
+   
 
     await addTokenToUser(resettoken, resettokenexpiry, email);
 
@@ -734,7 +860,7 @@ exports.postResetPassword = async (req, res, next) => {
     const [userresults] = await findUser({resettoken});
     const user = userresults[0];
 
-    if (!user) {
+    if (!user || user.length==0) {
       return sendHttpResponse(
         req,
         res,
