@@ -67,7 +67,6 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        console.log(profile)
         let email = profile.emails[0].value;
         let [user] = await findUser({ email: email });
         if (!user || user.length == 0) {
@@ -97,12 +96,13 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
-  done(null, user[0].email);
+  const id=user.insertId?user.insertId:user[0].id;
+  done(null, id);
 });
 
-passport.deserializeUser(async (email, done) => {
+passport.deserializeUser(async (id, done) => {
   try {
-    const [user] = await findUser({ email: email }); 
+    const [user] = await findUser({ id }); 
     done(null, user);
   } catch (error) {
     done(error);
@@ -123,9 +123,10 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
         })
       );
     }
+    const id=req.user.insertId?req.user.insertId:req.user[0].id;
 
-    const accessToken = generateAccessToken(req.user[0].id);
-    const refreshToken = generateRefreshToken(req.user[0].id);
+    const accessToken = generateAccessToken(id);
+    const refreshToken = generateRefreshToken(id);
 
     return sendHttpResponse(
       req,
