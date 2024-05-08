@@ -283,7 +283,7 @@ exports.sendOtpRegister = async (req, res, next) => {
   }
 };
 
-exports.varifyOtpRegister = async (req, res, next) => {
+exports.verifyOtpRegister = async (req, res, next) => {
   try {
     const { email, country_code, phoneno, password, otpid, enteredotp } =
       req.body;
@@ -354,7 +354,7 @@ exports.varifyOtpRegister = async (req, res, next) => {
 
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
-      [userResults] = await insertUser(
+      const [userResults] = await insertUser(
         email,
         country_code,
         phoneno,
@@ -398,7 +398,7 @@ exports.varifyOtpRegister = async (req, res, next) => {
       generateResponse({
         status: "error",
         statusCode: 500,
-        msg: "internal server error while varifying register otp👨🏻‍🔧",
+        msg: "internal server error while verifying register otp👨🏻‍🔧",
       })
     );
   }
