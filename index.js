@@ -13,7 +13,7 @@ const storeRoutes=require('./routes/store')
 
 app.use(bodyparser.json());
 app.use(session({
-    secret: 'your_secret_key', 
+    secret: process.env.SESSION_SECRET, 
     resave: false,
     saveUninitialized: false
   }));
