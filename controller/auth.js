@@ -354,10 +354,13 @@ exports.verifyOtpRegister = async (req, res, next) => {
 
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
+      const is_verify=phoneno?1:0;
+
       const [userResults] = await insertUser(
         email,
         country_code,
         phoneno,
+        is_verify,
         hashedPassword
       );
 
