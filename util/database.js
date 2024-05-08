@@ -8,4 +8,12 @@ const pool = mysql.createPool({
   database:process.env.DB_NAME,
 password:process.env.DB_PASSWORD});
 
+// pool.on('error', (err) => {
+//   console.error('MySQL Pool Error:', err);
+// });
+
+// pool.on('release', (connection) => {
+//   console.log('Connection %d released', connection.threadId);
+// });
+
 module.exports=pool.promise();

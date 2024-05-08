@@ -10,7 +10,7 @@ const authRoutes=require('./routes/auth')
 
 app.use(bodyparser.json());
 app.use(session({
-    secret: 'your_secret_key', 
+    secret: process.env.SESSION_SECRET, 
     resave: false,
     saveUninitialized: false
   }));

@@ -1,9 +1,8 @@
 require("dotenv").config();
 
-const passport=require('passport');
-const GoogleStrategy = require('passport-google-oauth2').Strategy;
-const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
-
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth2").Strategy;
+// const { Strategy: JwtStrategy, ExtractJwt } = require("passport-jwt");
 
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
@@ -19,89 +18,100 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
 } = require("../util/jwt");
-const { findUser, insertUser, updatePasswordAndToken, addTokenToUser, generateToken } = require("../repository/auth");
-const { resetPasswordSchema, sendOtpRegisterSchema, verifyOtpRegisterSchema, loginSchema, verifyLoginSchema, refreshAccessTokenSchema, postResetPasswordSchema } = require("../helper/validation_schema");
+const {
+  findUser,
+  insertUser,
+  updatePasswordAndToken,
+  addTokenToUser,
+  generateToken,
+} = require("../repository/auth");
+const {
+  resetPasswordSchema,
+  sendOtpRegisterSchema,
+  verifyOtpRegisterSchema,
+  loginSchema,
+  verifyLoginSchema,
+  refreshAccessTokenSchema,
+  postResetPasswordSchema,
+} = require("../helper/validation_schema");
+
+// const jwtOptions = {
+//   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+//   secretOrKey: process.env.JWT_SECRET,
+// };
 
 
+// passport.use(
+//   new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
+//     try {
+//       const user = await findUser(jwtPayload.id);
 
-const jwtOptions = {
-  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET // Replace this with your JWT secret key
-};
+//       if (user) {
+//         return done(null, user);
+//       } else {
+//         return done(null, false);
+//       }
+//     } catch (error) {
+//       return done(error, false);
+//     }
+//   })
+// );
 
-passport.use(new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
-  try {
-    // Find the user based on JWT payload
-    const user = await findUser(jwtPayload.id);
 
-    if (user) {
-      return done(null, user);
-    } else {
-      return done(null, false);
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_AUTH_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
+      callbackURL: process.env.NODE_ENV==='production'?"https://instacart-xqwi.onrender.com/auth/google/callback":"http://localhost:8080/auth/google/callback",
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        console.log(profile)
+        let email = profile.emails[0].value;
+        let [user] = await findUser({ email: email });
+        if (!user || user.length == 0) {
+          let country_code, phoneno, hashedPassword,firstName,
+          lastName,is_verify;
+          let from_google=1;
+          firstName=profile.given_name;
+          lastName=profile.family_name;
+
+          [user] = await insertUser(
+            email,
+            country_code,
+            phoneno,
+            firstName,
+            lastName,
+            is_verify,
+            hashedPassword,
+            from_google
+          );
+        }
+        done(null, user);
+      } catch (error) {
+        done(error);
+      }
     }
-  } catch (error) {
-    return done(error, false);
-  }
-}));
-
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_AUTH_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
-  callbackURL: "http://localhost:8080/auth/google/callback"
-},async (accessToken, refreshToken, profile, done) => {
-  try {
-    console.log('hello')
-    console.log(profile)
-    let email;
-    let [user] = await findUser({ email: profile.emails[0].value }); 
-// Check if user already exists
-    if (!user || user.length==0) {
-      // User doesn't exist, create a new user
-      // const newUser = {
-      //   // googleId: profile.id,
-      //   // displayName: profile.displayName,
-      //   email: profile.emails[0].value // Assuming you want to store the user's email
-      //   // Add other user data as needed
-      // };
-
-      email=profile.emails[0].value // Assuming you want to store the user's email
-      let country_code,phoneno,hashedPassword;
-      [user] = await insertUser(email,country_code,phoneno,hashedPassword); 
-      console.log(user)// Insert new user into database
-    }
-    done(null, user); // Return user object
-  } catch (error) {
-    done(error);
-  }
-}));
-
+  )
+);
 
 passport.serializeUser((user, done) => {
-  done(null, user);
+  done(null, user[0].email);
 });
 
 passport.deserializeUser(async (email, done) => {
   try {
-    const [user] = await findUser({email:email});// Replace with your function to find user by ID
+    const [user] = await findUser({ email: email }); 
     done(null, user);
   } catch (error) {
     done(error);
   }
 });
 
-// Example route handler for login/register with Google OAuth
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
-    console.log(req)
-    console.log('heeeeeeellllo')
-    // If user is authenticated (already logged in), redirect to home page or dashboard
-    if (req.isAuthenticated()) {
-      return res.redirect('/');
-    }
-
-    // Check if the user is found in the request object after successful Google OAuth authentication
     if (!req.user) {
-      // User not found in request object, return error or redirect to login page
       return sendHttpResponse(
         req,
         res,
@@ -112,12 +122,10 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
           msg: "User not authenticated",
         })
       );
-      
     }
 
-    // User is authenticated, you can generate JWT tokens or set up sessions here
-    const accessToken = generateAccessToken(req.user.id);
-    const refreshToken = generateRefreshToken(req.user.id);
+    const accessToken = generateAccessToken(req.user[0].id);
+    const refreshToken = generateRefreshToken(req.user[0].id);
 
     return sendHttpResponse(
       req,
@@ -129,20 +137,23 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
         data: {
           JWTToken: { accessToken, refreshToken },
         },
-        msg: "User registerd successfully✅",
+        msg: "User signedin or signedup using google successfully✅",
       })
     );
-    
-    // Optionally, you can redirect the user to a specific page after successful login/register
-    // res.redirect('/store'); // Change '/dashboard' to your desired redirect URL
   } catch (error) {
-    // Handle errors
-    console.error('Error in loginOrRegisterWithGoogle:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.log('Error in loginOrRegisterWithGoogle',error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while loginOrRegisterWithGoogle👨🏻‍🔧",
+      })
+    );
   }
 };
-
-
 
 exports.sendOtpRegister = async (req, res, next) => {
   try {
@@ -150,18 +161,18 @@ exports.sendOtpRegister = async (req, res, next) => {
     let isEmail = email !== undefined;
 
     const { error } = sendOtpRegisterSchema.validate(req.body);
-  if (error) {
-    return sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        status: "error",
-        statusCode: 400,
-        msg: error.details[0].message
-      })
-    );
-  }
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const [userResults] = await findUser(
       isEmail ? { email } : { phoneno: phoneno }
     );
@@ -287,21 +298,21 @@ exports.verifyOtpRegister = async (req, res, next) => {
   try {
     const { email, country_code, phoneno, password, otpid, enteredotp } =
       req.body;
-      const { error } = verifyOtpRegisterSchema.validate(req.body);
-      if (error) {
-        return sendHttpResponse(
-          req,
-          res,
-          next,
-          generateResponse({
-            status: "error",
-            statusCode: 400,
-            msg: error.details[0].message
-          })
-        );
-      }
-      let isEmail = email !== undefined;
-      const [userResults] = await findUser(
+    const { error } = verifyOtpRegisterSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+    let isEmail = email !== undefined;
+    const [userResults] = await findUser(
       isEmail ? { email } : { phoneno: phoneno }
     );
     if (isEmail && userResults.length > 0) {
@@ -354,14 +365,23 @@ exports.verifyOtpRegister = async (req, res, next) => {
 
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
-      const is_verify=phoneno?1:0;
+      const is_verify = phoneno ? 1 : 0;
+      let firstName, lastName;
+      const from_google=0;
+
+      if (email) {
+        firstName = email.substring(0, email.indexOf("@"));
+      }
 
       const [userResults] = await insertUser(
         email,
         country_code,
         phoneno,
+        firstName,
+        lastName,
         is_verify,
-        hashedPassword
+        hashedPassword,
+        from_google
       );
 
       const userId = userResults.insertId;
@@ -383,15 +403,17 @@ exports.verifyOtpRegister = async (req, res, next) => {
       );
     }
     return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          statusCode: 404,
-          status: "error",
-          msg: varificationresponse.reason ? varificationresponse.reason : "entered otp is wrong,please try again😓",
-        })
-      );
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 404,
+        status: "error",
+        msg: varificationresponse.reason
+          ? varificationresponse.reason
+          : "entered otp is wrong,please try again😓",
+      })
+    );
   } catch (error) {
     console.log(error);
     return sendHttpResponse(
@@ -407,9 +429,9 @@ exports.verifyOtpRegister = async (req, res, next) => {
   }
 };
 
-exports.login=async(req,res,next)=>{
-  try{
-    const {email,password,phoneno,country_code}=req.body;
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password, phoneno, country_code } = req.body;
 
     const { error } = loginSchema.validate(req.body);
     if (error) {
@@ -420,7 +442,7 @@ exports.login=async(req,res,next)=>{
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
@@ -428,7 +450,7 @@ exports.login=async(req,res,next)=>{
     let user;
     if (isEmail) {
       [user] = await findUser({ email });
-      if (user.length==0) {
+      if (user.length == 0) {
         return sendHttpResponse(
           req,
           res,
@@ -453,10 +475,9 @@ exports.login=async(req,res,next)=>{
           })
         );
       }
-    }
-    else{
+    } else {
       [user] = await findUser({ phoneno });
-      if (!user || user.length==0) {
+      if (!user || user.length == 0) {
         return sendHttpResponse(
           req,
           res,
@@ -510,7 +531,6 @@ exports.login=async(req,res,next)=>{
       );
     }
 
-   
     const accessToken = generateAccessToken(user[0].id);
     const refreshToken = generateRefreshToken(user[0].id);
 
@@ -527,8 +547,7 @@ exports.login=async(req,res,next)=>{
         msg: "Login successful✅",
       })
     );
-  }
-  catch(error){
+  } catch (error) {
     console.log(error);
     return sendHttpResponse(
       req,
@@ -541,12 +560,11 @@ exports.login=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
-
-exports.verifyOtpLogin=async(req,res,next)=>{
-  try{
-    const { country_code,phoneno, otpid, enteredotp } = req.body;
+exports.verifyOtpLogin = async (req, res, next) => {
+  try {
+    const { country_code, phoneno, otpid, enteredotp } = req.body;
     const { error } = verifyLoginSchema.validate(req.body);
     if (error) {
       return sendHttpResponse(
@@ -556,14 +574,14 @@ exports.verifyOtpLogin=async(req,res,next)=>{
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
     const phonewithcountrycode = country_code + phoneno;
 
     const [user] = await findUser({ phoneno });
-    if (!user || user.length==0) {
+    if (!user || user.length == 0) {
       return sendHttpResponse(
         req,
         res,
@@ -599,7 +617,6 @@ exports.verifyOtpLogin=async(req,res,next)=>{
     }
 
     if (varificationresponse.isOTPVerified === true) {
-
       const accessToken = generateAccessToken(user[0].id);
       const refreshToken = generateRefreshToken(user[0].id);
 
@@ -618,17 +635,18 @@ exports.verifyOtpLogin=async(req,res,next)=>{
       );
     }
     return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          statusCode: 404,
-          status: "error",
-          msg: varificationresponse.reason ? varificationresponse.reason : "entered otp is wrong,please try again😓",
-        })
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 404,
+        status: "error",
+        msg: varificationresponse.reason
+          ? varificationresponse.reason
+          : "entered otp is wrong,please try again😓",
+      })
     );
-  }
-  catch(error){
+  } catch (error) {
     console.log(error);
     return sendHttpResponse(
       req,
@@ -641,24 +659,24 @@ exports.verifyOtpLogin=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
 exports.refreshAccessToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
     const { error } = refreshAccessTokenSchema.validate(req.body);
-  if (error) {
-    return sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        status: "error",
-        statusCode: 400,
-        msg: error.details[0].message
-      })
-    );
-  }
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const userId = verifyRefreshToken(refreshToken);
     if (userId === "expired") {
       return sendHttpResponse(
@@ -757,7 +775,6 @@ exports.resendOtp = async (req, res, next) => {
   }
 };
 
-
 exports.resetPasswordLink = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -774,7 +791,7 @@ exports.resetPasswordLink = async (req, res, next) => {
         })
       );
     }
-    const [userResults] = await findUser({email});
+    const [userResults] = await findUser({ email });
     const user = userResults[0];
     if (!user) {
       return sendHttpResponse(
@@ -794,7 +811,6 @@ exports.resetPasswordLink = async (req, res, next) => {
       tokenlength,
       expiryhours
     );
-   
 
     await addTokenToUser(resettoken, resettokenexpiry, email);
 
@@ -853,15 +869,15 @@ exports.postResetPassword = async (req, res, next) => {
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
-    
-    const [userresults] = await findUser({resettoken});
+
+    const [userresults] = await findUser({ resettoken });
     const user = userresults[0];
 
-    if (!user || user.length==0) {
+    if (!user || user.length == 0) {
       return sendHttpResponse(
         req,
         res,
@@ -916,5 +932,3 @@ exports.postResetPassword = async (req, res, next) => {
     );
   }
 };
-
-
