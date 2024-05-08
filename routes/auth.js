@@ -9,7 +9,7 @@ router.get('/auth/google/callback', passport.authenticate('google', { failureRed
 
 
 router.post("/register", authcontroller.sendOtpRegister);
-router.post("/register/verify", authcontroller.varifyOtpRegister);
+router.post("/register/verify", authcontroller.verifyOtpRegister);
 
 router.post("/login", authcontroller.login);
 router.post("/login/verify", authcontroller.verifyOtpLogin);
