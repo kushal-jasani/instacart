@@ -453,7 +453,7 @@ exports.login=async(req,res,next)=>{
     }
     else{
       [user] = await findUser({ phoneno });
-      if (!user) {
+      if (!user || user.length==0) {
         return sendHttpResponse(
           req,
           res,
@@ -560,7 +560,7 @@ exports.verifyOtpLogin=async(req,res,next)=>{
     const phonewithcountrycode = country_code + phoneno;
 
     const [user] = await findUser({ phoneno });
-    if (!user) {
+    if (!user || user.length==0) {
       return sendHttpResponse(
         req,
         res,
@@ -791,8 +791,7 @@ exports.resetPasswordLink = async (req, res, next) => {
       tokenlength,
       expiryhours
     );
-    // console.log(resettoken);
-    // console.log(resettokenexpiry);
+   
 
     await addTokenToUser(resettoken, resettokenexpiry, email);
 
@@ -859,7 +858,7 @@ exports.postResetPassword = async (req, res, next) => {
     const [userresults] = await findUser({resettoken});
     const user = userresults[0];
 
-    if (!user) {
+    if (!user || user.length==0) {
       return sendHttpResponse(
         req,
         res,
