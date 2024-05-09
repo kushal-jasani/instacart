@@ -34,6 +34,7 @@ const {
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
+    console.log('into callback')
     if (!req.user) {
       return sendHttpResponse(
         req,
@@ -62,6 +63,7 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
       </script>
     </html>
     `;
+    console.log(htmlWithEmbeddedJWT)
     res.send(htmlWithEmbeddedJWT)
   } catch (error) {
     console.log("Error in loginOrRegisterWithGoogle", error);
