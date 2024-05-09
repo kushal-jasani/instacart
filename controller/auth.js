@@ -54,11 +54,11 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
     <html>
       <script>
         // Save JWT to localStorage
-        window.localStorage.setItem('accessToken', '${accessToken}');
-        window.localStorage.setItem('refreshToken', '${refreshToken}');
+        window.localStorage.setItem('accessToken','${accessToken}');
+        window.localStorage.setItem('refreshToken','${refreshToken}');
 
         // Redirect browser to root of application
-        window.location.href = ${process.env.NODE_ENV==='production' ? process.env.REDIRECT_LIVE  : process.env.REDIRECT_LOCAL};
+        window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
       </script>
     </html>
     `;

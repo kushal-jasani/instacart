@@ -19,7 +19,6 @@ passport.use(
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
-          console.log(accessToken, refreshToken);
           let email = profile.emails[0].value;
           let [user] = await findUser({ email: email });
           if (!user || user.length == 0) {
