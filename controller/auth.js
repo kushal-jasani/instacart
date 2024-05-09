@@ -1,9 +1,5 @@
 require("dotenv").config();
 
-const passport = require("passport");
-const GoogleStrategy = require("passport-google-oauth2").Strategy;
-// const { Strategy: JwtStrategy, ExtractJwt } = require("passport-jwt");
-
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 const otpless = require("otpless-node-js-auth-sdk");
@@ -25,6 +21,7 @@ const {
   addTokenToUser,
   generateToken,
 } = require("../repository/auth");
+
 const {
   resetPasswordSchema,
   sendOtpRegisterSchema,
@@ -34,80 +31,6 @@ const {
   refreshAccessTokenSchema,
   postResetPasswordSchema,
 } = require("../helper/validation_schema");
-
-// const jwtOptions = {
-//   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-//   secretOrKey: process.env.JWT_SECRET,
-// };
-
-
-// passport.use(
-//   new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
-//     try {
-//       const user = await findUser(jwtPayload.id);
-
-//       if (user) {
-//         return done(null, user);
-//       } else {
-//         return done(null, false);
-//       }
-//     } catch (error) {
-//       return done(error, false);
-//     }
-//   })
-// );
-
-
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_AUTH_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
-      callbackURL: process.env.NODE_ENV==='production'?"https://instacart-xqwi.onrender.com/auth/google/callback":"http://localhost:8080/auth/google/callback",
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        let email = profile.emails[0].value;
-        let [user] = await findUser({ email: email });
-        if (!user || user.length == 0) {
-          let country_code, phoneno, hashedPassword,firstName,
-          lastName,is_verify;
-          let from_google=1;
-          firstName=profile.given_name;
-          lastName=profile.family_name;
-
-          [user] = await insertUser(
-            email,
-            country_code,
-            phoneno,
-            firstName,
-            lastName,
-            is_verify,
-            hashedPassword,
-            from_google
-          );
-        }
-        done(null, user);
-      } catch (error) {
-        done(error);
-      }
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  const id=user.insertId?user.insertId:user[0].id;
-  done(null, id);
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const [user] = await findUser({ id }); 
-    done(null, user);
-  } catch (error) {
-    done(error);
-  }
-});
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
@@ -123,26 +46,25 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
         })
       );
     }
-    const id=req.user.insertId?req.user.insertId:req.user[0].id;
+    const id = req.user.insertId ? req.user.insertId : req.user[0].id;
 
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
+    const htmlWithEmbeddedJWT = `
+    <html>
+      <script>
+        // Save JWT to localStorage
+        window.localStorage.setItem('accessToken', '${accessToken}');
+        window.localStorage.setItem('refreshToken', '${refreshToken}');
 
-    return sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        statusCode: 201,
-        status: "success",
-        data: {
-          JWTToken: { accessToken, refreshToken },
-        },
-        msg: "User signedin or signedup using google successfully✅",
-      })
-    );
+        // Redirect browser to root of application
+        window.location.href = ${process.env.NODE_ENV==='production' ? process.env.REDIRECT_LIVE  : process.env.REDIRECT_LOCAL};
+      </script>
+    </html>
+    `;
+    res.send(htmlWithEmbeddedJWT)
   } catch (error) {
-    console.log('Error in loginOrRegisterWithGoogle',error);
+    console.log("Error in loginOrRegisterWithGoogle", error);
     return sendHttpResponse(
       req,
       res,
@@ -368,7 +290,7 @@ exports.verifyOtpRegister = async (req, res, next) => {
       const hashedPassword = await bcrypt.hash(password, 8);
       const is_verify = phoneno ? 1 : 0;
       let firstName, lastName;
-      const from_google=0;
+      const from_google = 0;
 
       if (email) {
         firstName = email.substring(0, email.indexOf("@"));
