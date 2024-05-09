@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const passport = require("passport");
 const { findUser, insertUser } = require("../repository/auth");
 const passportGoogle = require("passport-google-oauth2").Strategy;
