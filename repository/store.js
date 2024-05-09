@@ -9,7 +9,7 @@ const getAllStores = async () => {
     JSON_ARRAYAGG(sc.name) AS store_categories
 FROM store s
 LEFT JOIN store_category sc ON s.id = sc.store_id
-GROUP BY s.id, s.name , s.logo;`);
+GROUP BY s.id, s.name , s.logo LIMIT 5;`);
 };
 
 const checkInStorePrices = async (store_id) => {
