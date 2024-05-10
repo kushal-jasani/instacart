@@ -7,6 +7,15 @@ const {
   getStoresOpenAfterEleven,
   getPickupAvailableStores,
   getStoreByCategory,
+  findStoreFrontDetails,
+  findStoreInsideDetails,
+  formatBagFee,
+  formatServiceFee,
+  formatDeliveryFee,
+  getNextDeliverySlot,
+  formatHours,
+  deliveryTimings,
+  findSubCategoryOfStore,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -176,6 +185,53 @@ exports.getStoresByCategory = async (req, res, next) => {
 
 exports.getStoreDetailsFront = async (req, res, next) => {
   try {
+    const { storeId } = req.params;
+
+    const [results] = await findStoreFrontDetails(storeId);
+
+    if (!results || results.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "Store not found!!",
+        })
+      );
+    }
+
+    const response = results.map((store) => {
+      const messages = [];
+      messages.push(store.type);
+      if (store.has_service_fee === 1 && store.has_bag_fee === 1) {
+        messages.push("Bag and services fees apply");
+      }
+      messages.push(
+        `$${store.charge} delivery fee on $${store.min_order_value}+`
+      );
+
+      return {
+        store_id: store.store_id,
+        store_name: store.store_name,
+        logo: store.logo,
+        categories: store.categories,
+        messages: messages,
+      };
+    });
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: response,
+        msg: "Store front details fetched successfully",
+      })
+    );
   } catch (error) {
     console.log("Error while fetching store front detail: ", error);
     return sendHttpResponse(
@@ -190,3 +246,134 @@ exports.getStoreDetailsFront = async (req, res, next) => {
     );
   }
 };
+
+exports.getStoreSubcategory=async(req,res,next)=>{
+  try{
+    const {categoryId}=req.params;
+
+    const [subCategoryResults]=await findSubCategoryOfStore(categoryId);
+
+    if (!subCategoryResults || subCategoryResults.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "No Subcategory for this Category found!!",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: subCategoryResults,
+        msg: "Subcategory details fetched successfully",
+      })
+    );
+
+  }
+  catch(error){
+    console.log("Error while fetching subcategories: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching subcategories👨🏻‍🔧",
+      })
+    );
+  }
+}
+
+exports.getStoreDetailsInside = async (req, res, next) => {
+  try {
+    const { storeId } = req.params;
+
+    const [queryResult] = await findStoreInsideDetails(storeId);
+
+    if (!queryResult || queryResult.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "Store not found!!",
+        })
+      );
+    }
+
+    var response = queryResult.map((store) => ({
+      store_id:store.store_id, 
+      store_name:store.store_name, 
+      logo:store.logo,
+      store_categories:store.store_categories,
+      pricing: {
+        store_pricing_type: store.store_pricing_type,
+        store_pricing_description: store.store_pricing_description,
+        delivery_fee: store.is_delivery_avail ? formatDeliveryFee(store) : null,
+        service_fee: store.has_service_fee ? formatServiceFee(store) : null,
+        bag_fee: store.has_bag_fee ? formatBagFee(store) : null,
+      },
+      "return policy": {
+        return_policy_title: store.return_policy_title,
+        decrtiption: store.policy_description,
+      },
+      delivery_time: {
+        next_delivery: getNextDeliverySlot(store.delivery_timings),
+        delivery_timings: deliveryTimings(store.delivery_timings),
+      },
+      ...(store.is_pickup_avail === 1
+        ? {
+            pickup_time: {
+              next_pickup: getNextDeliverySlot(store.pickup_timings),
+              pickup_timings: deliveryTimings(store.pickup_timings),
+            },
+          }
+        : {}),
+      about: {
+        description: store.description,
+        is_delivery_avail: store.is_delivery_avail,
+        is_pickup_avail: store.is_pickup_avail,
+      },
+      hours: formatHours(store.store_opening_info),
+    })
+  );
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: response,
+        msg: "Store-Inside details fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching store inside detail: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching store inside detail👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+
