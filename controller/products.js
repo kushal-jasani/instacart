@@ -55,6 +55,8 @@ exports.getProductDetail=async(req,res,next)=>{
             product_ingredients: product.product_ingredients,
             product_directions: product.product_directions,
             product_images: product.product_images,
+            label:product.quantity === 1 ? `${product.quantity_varient} ${product.unit}`
+              : `${product.quantity} × ${product.quantity_varient} ${product.unit}`,
             actual_price: product.actual_price,
             selling_price: product.selling_price,
             ...(perUnitPrice !== null && { per_unit_price: perUnitPrice }),
