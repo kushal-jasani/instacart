@@ -133,8 +133,8 @@ WHERE
   return await db.query(query, [store_id]);
 };
 
-const findStoreInsideDetails=async(store_id)=>{
-  const query=`SELECT 
+const findStoreInsideDetails = async (store_id) => {
+  const query = `SELECT 
   s.id AS store_id, 
   s.name AS store_name, 
   s.logo,
@@ -194,59 +194,100 @@ GROUP BY
   sf.max_percentage,
   sf.min_value,
   sf.per_item_charge;
-`
+`;
   return await db.query(query, [store_id]);
-}
+};
 
-const findSubCategoryOfStore=async(category_id)=>{
-  return await db.query(`SELECT id,name FROM store_products_subcategories sps WHERE category_id=?`,[category_id])
-}
+const findSubCategoryOfStore = async (category_id) => {
+  return await db.query(
+    `SELECT 
+    sps.id AS subcategory_id,
+    sps.name AS subcategory_name,
+    p.id AS product_id,
+    p.title AS product_title,
+    (SELECT pi.image from images pi WHERE p.id = pi.product_id LIMIT 1) AS product_image,
+    pq.quantity AS quantity,
+    pq.quantity_varient AS quantity_variant,
+    pq.unit AS unit,
+    pq.actual_price AS actual_price,
+    pq.selling_price AS selling_price,
+    p.discount_id,
+    d.buy_quantity,
+    d.get_quantity,
+    d.discount_type,
+    d.discount
+FROM 
+    store_products_subcategories sps
+LEFT JOIN 
+    products p ON sps.id = p.subcategory_id
+LEFT JOIN 
+    discounts d ON p.discount_id = d.id
+LEFT JOIN 
+    product_quantity pq ON p.id = pq.product_id
+WHERE 
+    sps.category_id = ?
+GROUP BY 
+    sps.id, sps.name, p.id, p.title, p.description, p.ingredients, p.directions, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price,d.buy_quantity, d.get_quantity, d.discount_type, d.discount`,
+    [category_id]
+  );
+};
 
-
-const formatDeliveryFee=(df)=> {
+const formatDeliveryFee = (df) => {
   if (df.has_priority_avail) {
-      var priorityFeeMsg = `Priority delivery: An additional $${df.additional_charge} will be charged.`;
+    var priorityFeeMsg = `Priority delivery: An additional $${df.additional_charge} will be charged.`;
   } else {
-      var priorityFeeMsg = "";
+    var priorityFeeMsg = "";
   }
   return `This fee is based on the delivery option you choose.\n • ${df.delivery_fee_type} delivery: $${df.charge} on orders $${df.min_order_value}+ and $${df.lesser_value_charge} on orders less than $35.\n • ${priorityFeeMsg}`;
-}
+};
 
-const formatServiceFee=(sf)=> {
+const formatServiceFee = (sf) => {
   if (sf.max_percentage) {
-      var serviceFeeMsg = `The service fee helps support the Instacart platform and covers a range of operating costs. The service fee will vary up to ${sf.max_percentage}% of your order total subject to a minimum fee of $${sf.min_value} per order or $${sf.per_item_charge} per item, whichever is more.`;
+    var serviceFeeMsg = `The service fee helps support the Instacart platform and covers a range of operating costs. The service fee will vary up to ${sf.max_percentage}% of your order total subject to a minimum fee of $${sf.min_value} per order or $${sf.per_item_charge} per item, whichever is more.`;
   } else {
-      var serviceFeeMsg = "";
+    var serviceFeeMsg = "";
   }
   return serviceFeeMsg;
-}
+};
 
-const formatBagFee=(bf)=> {
+const formatBagFee = (bf) => {
   return `The retailer may charge a fee of up to $${bf.bag_fee} per bag. This fee will be added after checkout depending on the number of bags used.`;
-}
+};
 
-const getDayName=(day)=>{
-  var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const getDayName = (day) => {
+  var days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   return days[day];
-}
+};
 
-const convertTo24Hour=(time)=> {
-  var hours = parseInt(time.split(':')[0]);
-  var minutes = parseInt(time.split(':')[1].split(' ')[0]);
-  var period = time.split(':')[1].split(' ')[1];
+const convertTo24Hour = (time) => {
+  var hours = parseInt(time.split(":")[0]);
+  var minutes = parseInt(time.split(":")[1].split(" ")[0]);
+  var period = time.split(":")[1].split(" ")[1];
 
-  if (period === 'am' && hours === 12) {
-      hours = 0;
-  } else if (period === 'pm' && hours < 12) {
-      hours += 12;
+  if (period === "am" && hours === 12) {
+    hours = 0;
+  } else if (period === "pm" && hours < 12) {
+    hours += 12;
   }
 
-  return hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0');
-}
+  return (
+    hours.toString().padStart(2, "0") +
+    ":" +
+    minutes.toString().padStart(2, "0")
+  );
+};
 
-const getNextDeliverySlot=(deliveryTimings) =>{
-  if(!deliveryTimings || deliveryTimings.length==0){
-    return 'not available'
+const getNextDeliverySlot = (deliveryTimings) => {
+  if (!deliveryTimings || deliveryTimings.length == 0) {
+    return "not available";
   }
   var today = new Date().getDay();
   var currentTime = new Date();
@@ -256,94 +297,123 @@ const getNextDeliverySlot=(deliveryTimings) =>{
   var currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
   for (var i = 0; i < deliveryTimings.length; i++) {
-      var deliveryTime = deliveryTimings[i];
-      var timeSlotParts = deliveryTime.time_slot.split(' - ');
-      var startTime = convertTo24Hour(timeSlotParts[0]);
-      var endTime = convertTo24Hour(timeSlotParts[1]);
-      var startTimeParts = startTime.split(':');
-      var endTimeParts = endTime.split(':');
-        
-    
-      var startHours = parseInt(startTimeParts[0]);
-      var startMinutes = parseInt(startTimeParts[1]);
-      var endHours = parseInt(endTimeParts[0]);
-      var endMinutes = parseInt(endTimeParts[1]);
+    var deliveryTime = deliveryTimings[i];
+    var timeSlotParts = deliveryTime.time_slot.split(" - ");
+    var startTime = convertTo24Hour(timeSlotParts[0]);
+    var endTime = convertTo24Hour(timeSlotParts[1]);
+    var startTimeParts = startTime.split(":");
+    var endTimeParts = endTime.split(":");
 
-      var startTimeInMinutes = startHours * 60 + startMinutes;
-      var endTimeInMinutes = endHours * 60 + endMinutes;
-      if (parseInt(deliveryTime.day) === today) {
-        // Check if the current time falls within this time slot
-        if (currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes < endTimeInMinutes) {
-            // Find the next time slot after the current time
-            if (i < deliveryTimings.length - 1) {
-                var nextDeliveryTime = deliveryTimings[i + 1];
-                return { day: "Today", timeSlot: nextDeliveryTime.time_slot };
-            } else {
-                // If there are no more time slots for today, return the first time slot of tomorrow
-                var nextDay = today === 6 ? 0 : today + 1;
-                for (var j = 0; j < deliveryTimings.length; j++) {
-                    if (parseInt(deliveryTimings[j].day) === nextDay) {
-                        return { day: "Tomorrow", timeSlot: deliveryTimings[j].time_slot };
-                    }
-                }
+    var startHours = parseInt(startTimeParts[0]);
+    var startMinutes = parseInt(startTimeParts[1]);
+    var endHours = parseInt(endTimeParts[0]);
+    var endMinutes = parseInt(endTimeParts[1]);
+
+    var startTimeInMinutes = startHours * 60 + startMinutes;
+    var endTimeInMinutes = endHours * 60 + endMinutes;
+    if (parseInt(deliveryTime.day) === today) {
+      // Check if the current time falls within this time slot
+      if (
+        currentTimeInMinutes >= startTimeInMinutes &&
+        currentTimeInMinutes < endTimeInMinutes
+      ) {
+        // Find the next time slot after the current time
+        if (i < deliveryTimings.length - 1) {
+          var nextDeliveryTime = deliveryTimings[i + 1];
+          return { day: "Today", timeSlot: nextDeliveryTime.time_slot };
+        } else {
+          // If there are no more time slots for today, return the first time slot of tomorrow
+          var nextDay = today === 6 ? 0 : today + 1;
+          for (var j = 0; j < deliveryTimings.length; j++) {
+            if (parseInt(deliveryTimings[j].day) === nextDay) {
+              return {
+                day: "Tomorrow",
+                timeSlot: deliveryTimings[j].time_slot,
+              };
             }
+          }
         }
+      }
     } else if (parseInt(deliveryTime.day) > today) {
-        return { day: getDayName(parseInt(deliveryTime.day)), timeSlot: deliveryTime.time_slot };
+      return {
+        day: getDayName(parseInt(deliveryTime.day)),
+        timeSlot: deliveryTime.time_slot,
+      };
     }
   }
   return null;
-}
+};
 
 function formatHours(openingInfo) {
-  if(!openingInfo || openingInfo.length==0){
-    return 'not available'
+  if (!openingInfo || openingInfo.length == 0) {
+    return "not available";
   }
-  var daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   var hours = {};
-  openingInfo.forEach(info => {
-      var day = daysOfWeek[parseInt(info.day)];
-      var timeSlot = info.time_slot;
-      hours[day] = timeSlot;
+  openingInfo.forEach((info) => {
+    var day = daysOfWeek[parseInt(info.day)];
+    var timeSlot = info.time_slot;
+    hours[day] = timeSlot;
   });
   return hours;
 }
 
-const deliveryTimings=(deliveryTimings)=>{
-  if(!deliveryTimings || deliveryTimings.length==0){
-    return 'not available'
+const deliveryTimings = (deliveryTimings) => {
+  if (!deliveryTimings || deliveryTimings.length == 0) {
+    return "not available";
   }
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const today = new Date().getDay();
   const modifiedTimings = [];
 
- 
   for (let i = 0; i < 7; i++) {
-      const dayIndex = (today + i) % 7; 
-      const dayName = (i === 0) ? 'Today' : daysOfWeek[dayIndex]; 
+    const dayIndex = (today + i) % 7;
+    const dayName = i === 0 ? "Today" : daysOfWeek[dayIndex];
 
-      const daySlots = deliveryTimings.filter(slot => parseInt(slot.day) === dayIndex);
+    const daySlots = deliveryTimings.filter(
+      (slot) => parseInt(slot.day) === dayIndex
+    );
 
-      const modifiedDaySlots = daySlots.map(slot => {
-          return {
-              price: slot.price,
-              time_slot: slot.time_slot
-          };
-      });
-
-      const formattedDayName = (i === 0) ? dayName : `${dayName}, ${new Date(new Date().setDate(new Date().getDate() + i)).toLocaleString('en-US', { month: 'short', day: 'numeric' })}`;
-
-      const modifiedDay = {
-          day: formattedDayName,
-          slots: modifiedDaySlots
+    const modifiedDaySlots = daySlots.map((slot) => {
+      return {
+        price: slot.price,
+        time_slot: slot.time_slot,
       };
+    });
 
-      modifiedTimings.push(modifiedDay);
+    const formattedDayName =
+      i === 0
+        ? dayName
+        : `${dayName}, ${new Date(
+            new Date().setDate(new Date().getDate() + i)
+          ).toLocaleString("en-US", { month: "short", day: "numeric" })}`;
+
+    const modifiedDay = {
+      day: formattedDayName,
+      slots: modifiedDaySlots,
+    };
+
+    modifiedTimings.push(modifiedDay);
   }
 
   return modifiedTimings;
-
-}
+};
 
 module.exports = {
   getMainCategories,
@@ -361,5 +431,5 @@ module.exports = {
   getNextDeliverySlot,
   formatHours,
   deliveryTimings,
-  findSubCategoryOfStore
+  findSubCategoryOfStore,
 };

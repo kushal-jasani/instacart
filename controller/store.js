@@ -247,11 +247,11 @@ exports.getStoreDetailsFront = async (req, res, next) => {
   }
 };
 
-exports.getStoreSubcategory=async(req,res,next)=>{
-  try{
-    const {categoryId}=req.params;
+exports.getStoreSubcategory = async (req, res, next) => {
+  try {
+    const { categoryId } = req.params;
 
-    const [subCategoryResults]=await findSubCategoryOfStore(categoryId);
+    const [subCategoryResults] = await findSubCategoryOfStore(categoryId);
 
     if (!subCategoryResults || subCategoryResults.length == 0) {
       return sendHttpResponse(
@@ -266,6 +266,46 @@ exports.getStoreSubcategory=async(req,res,next)=>{
       );
     }
 
+
+    const modifiedResponse = subCategoryResults.reduce((acc, curr) => {
+      const subcategoryId = curr.subcategory_id;
+      const subcategoryName = curr.subcategory_name;
+      if (!acc[subcategoryId]) {
+        acc[subcategoryId] = {
+          subcategory_id: subcategoryId,
+          subcategory_name: subcategoryName,
+          products: [],
+        };
+      }
+
+      let discountLabel = null;
+    if (curr.discount_id !== null) {
+      if (curr.discount === null) {
+        discountLabel = `Buy ${curr.buy_quantity}, get ${curr.get_quantity}`;
+      } else {
+        if (curr.discount_type === "fixed") {
+          discountLabel = `Buy ${curr.buy_quantity}, get $${curr.discount} off`;
+        } else if (curr.discount_type === "rate") {
+          discountLabel = `Buy ${curr.buy_quantity}, get ${curr.discount}% off`;
+        }
+      }
+    }
+
+      acc[subcategoryId].products.push({
+        id: curr.product_id,
+        title: curr.product_title,
+        image: curr.product_image,
+        label:curr.quantity === 1 ? `${curr.quantity_variant} ${curr.unit}`
+              : `${curr.quantity} × ${curr.quantity_variant} ${curr.unit}`,
+        actual_price: curr.actual_price,
+        selling_price: curr.selling_price,
+        ...(curr.discount_id !== null && { discount_label: discountLabel })
+      });
+      return acc;
+    }, {});
+
+    const responseArray = Object.values(modifiedResponse);
+
     return sendHttpResponse(
       req,
       res,
@@ -273,13 +313,11 @@ exports.getStoreSubcategory=async(req,res,next)=>{
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: subCategoryResults,
-        msg: "Subcategory details fetched successfully",
+        data: responseArray,
+        msg: "Subcategory and products details fetched successfully",
       })
     );
-
-  }
-  catch(error){
+  } catch (error) {
     console.log("Error while fetching subcategories: ", error);
     return sendHttpResponse(
       req,
@@ -292,7 +330,7 @@ exports.getStoreSubcategory=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
 exports.getStoreDetailsInside = async (req, res, next) => {
   try {
@@ -308,16 +346,16 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         generateResponse({
           status: "error",
           statusCode: 404,
-          msg: "Store not found!!",
+          msg: "Store Detail not found!!",
         })
       );
     }
 
     var response = queryResult.map((store) => ({
-      store_id:store.store_id, 
-      store_name:store.store_name, 
-      logo:store.logo,
-      store_categories:store.store_categories,
+      store_id: store.store_id,
+      store_name: store.store_name,
+      logo: store.logo,
+      store_categories: store.store_categories,
       pricing: {
         store_pricing_type: store.store_pricing_type,
         store_pricing_description: store.store_pricing_description,
@@ -325,7 +363,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         service_fee: store.has_service_fee ? formatServiceFee(store) : null,
         bag_fee: store.has_bag_fee ? formatBagFee(store) : null,
       },
-      "return policy": {
+      return_policy: {
         return_policy_title: store.return_policy_title,
         decrtiption: store.policy_description,
       },
@@ -347,8 +385,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         is_pickup_avail: store.is_pickup_avail,
       },
       hours: formatHours(store.store_opening_info),
-    })
-  );
+    }));
 
     return sendHttpResponse(
       req,
@@ -375,5 +412,3 @@ exports.getStoreDetailsInside = async (req, res, next) => {
     );
   }
 };
-
-
