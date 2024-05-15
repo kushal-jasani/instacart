@@ -7,20 +7,21 @@ const getMainCategories = async () => {
 const getAllStores = async () => {
   return await db.query(`SELECT s.id, s.name, s.logo,s.is_pickup_avail,
     JSON_ARRAYAGG(sc.name) AS store_categories
-FROM store s
-LEFT JOIN store_category sc ON s.id = sc.store_id
-GROUP BY s.id, s.name , s.logo LIMIT 5;`);
+    FROM store s
+    LEFT JOIN store_category sc ON s.id = sc.store_id
+    GROUP BY s.id, s.name , s.logo ;`);
 };
 
-const checkInStorePrices = async (store_id) => {
+const checkInStorePrices = async (storeIds) => {
   return await db.query(
-    `SELECT * FROM store_pricing
-  WHERE store_id = ? AND is_instore = 1;`,
-    [store_id]
+    `SELECT store_id
+    FROM store_pricing
+    WHERE store_id IN (?) AND is_instore = 1;`,
+    [storeIds]
   );
 };
 
-const getNextDeliveryTime = async (store_id) => {
+const getNextDeliveryTime = async (storeIds) => {
   const currentDate = new Date();
   currentDate.setMinutes(currentDate.getMinutes() - 60);
   const currentDay = currentDate.getDay();
@@ -40,67 +41,59 @@ const getNextDeliveryTime = async (store_id) => {
     minute: "2-digit",
     hour12: true,
   });
-  const todayQuery = `SELECT time_slot
+  const todayQuery = `SELECT store_id, time_slot
                       FROM timing
-                      WHERE store_id = ? AND day = ? AND is_delivery_time = 1 AND time_slot > ?
-                      ORDER BY time_slot
-                      LIMIT 1`;
+                      WHERE store_id IN (?) AND day = ? AND is_delivery_time = 1 AND time_slot > ?
+                      ORDER BY store_id, time_slot;
+                      `;
 
-  const tomorrowQuery = `SELECT time_slot
-                           FROM timing
-                           WHERE store_id = ? AND day = ? AND is_delivery_time = 1
-                           ORDER BY time_slot
-                           LIMIT 1`;
+  const tomorrowQuery = `SELECT store_id, time_slot
+                          FROM timing
+                          WHERE store_id IN (?) AND day = ?
+                          AND is_delivery_time = 1
+                          ORDER BY store_id, time_slot;`;
 
-  let [todayRows] = await db.query(todayQuery, [
-    store_id,
+  const [todayRows] = await db.query(todayQuery, [
+    storeIds,
     currentDay,
     currentTime,
   ]);
 
-  if (todayRows.length > 0) {
-    const todayUpperSlot = todayRows[0].time_slot.split(" - ")[1];
-    return `Today, ${todayUpperSlot}`;
-  }
-
+  
   const nextDay = (currentDay + 1) % 7;
-  let [tomorrowRows] = await db.query(tomorrowQuery, [store_id, nextDay]);
-  if (tomorrowRows.length > 0) {
-    const tomorrowUpperSlot = tomorrowRows[0].time_slot.split(" - ")[1];
-    return `Tomorrow, ${tomorrowUpperSlot}`;
-  }
-  return null;
+  const [tomorrowRows] = await db.query(tomorrowQuery, [storeIds, nextDay]);
+  return {todayRows,tomorrowRows}
 };
 
 const getStoresOpenAfterEleven = async () => {
   const currentDate = new Date();
   const currentDay = currentDate.getDay();
 
-  const query = `SELECT s.id, s.name, s.logo, s.is_pickup_avail, JSON_ARRAYAGG(sc.name) AS store_categories
- FROM store s
- LEFT JOIN store_category sc ON s.id = sc.store_id
- INNER JOIN (
-     SELECT store_id, 
-            SUBSTRING_INDEX(time_slot, ' - ', 1) AS start_time
-     FROM store_opening
-     WHERE day = ? 
- ) so ON s.id = so.store_id
- WHERE TIME_FORMAT(start_time, '%l:%i %p') <= '11:00 AM'
- GROUP BY s.id, s.name , s.logo;`;
+  const query = `SELECT s.id, s.name, s.logo, s.is_pickup_avail,
+  JSON_ARRAYAGG(sc.name) AS store_categories
+  FROM store s
+  LEFT JOIN store_category sc ON s.id = sc.store_id
+  INNER JOIN (
+      SELECT store_id, SUBSTRING_INDEX(time_slot, ' - ', 1) AS start_time
+      FROM store_opening
+      WHERE day = ? AND TIME_FORMAT(SUBSTRING_INDEX(time_slot, ' - ', 1), '%h:%i %p') > '10:59 AM'
+  ) so ON s.id = so.store_id
+  GROUP BY s.id, s.name, s.logo;`;
   return await db.query(query, [currentDay]);
 };
 
 const getPickupAvailableStores = async () => {
   return await db.query(`SELECT s.id, s.name, s.logo,s.is_pickup_avail,
     JSON_ARRAYAGG(sc.name) AS store_categories
-FROM store s
-LEFT JOIN store_category sc ON s.id = sc.store_id
-WHERE is_pickup_avail=1
-GROUP BY s.id, s.name , s.logo;`);
+    FROM store s
+    LEFT JOIN store_category sc ON s.id = sc.store_id
+    WHERE is_pickup_avail=1
+    GROUP BY s.id, s.name , s.logo;`);
 };
 
 const getStoreByCategory = async (main_category_id) => {
-  const query = `SELECT s.id, s.name, s.logo,s.is_pickup_avail,JSON_ARRAYAGG(sc.name) AS store_categories 
+  const query = `SELECT s.id, s.name, s.logo,s.is_pickup_avail,
+  JSON_ARRAYAGG(sc.name) AS store_categories 
   FROM store s
   INNER JOIN store_category sc ON s.id = sc.store_id
   WHERE sc.main_category_id = ?
