@@ -3,7 +3,7 @@ const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 exports.getProductDetail=async(req,res,next)=>{
     try{
-        const { productId } = req.params;
+        const { productId } = req.body;
         const userId=req.user.userId; 
         const [productResults]=await findProductDetail(productId,userId);
 
