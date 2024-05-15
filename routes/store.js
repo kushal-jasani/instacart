@@ -9,5 +9,8 @@ router.get('/:storeId/front',storeController.getStoreDetailsFront);
 router.get('/:storeId/info',storeController.getStoreDetailsInside);
 router.get('/collection/:categoryId',storeController.getStoreSubcategory);
 
+router.get('/collection/subcategory/:subcategoryId',storeController.getProductsFromSubCategory);
+
+router.get('/collection/store/:storeId',storeController.getProductsByStoreId);
 
 module.exports=router;

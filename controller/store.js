@@ -16,6 +16,8 @@ const {
   formatHours,
   deliveryTimings,
   findSubCategoryOfStore,
+  findProductsOfSubcategory,
+  findProductsByStoreId,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -266,7 +268,6 @@ exports.getStoreSubcategory = async (req, res, next) => {
       );
     }
 
-
     const modifiedResponse = subCategoryResults.reduce((acc, curr) => {
       const subcategoryId = curr.subcategory_id;
       const subcategoryName = curr.subcategory_name;
@@ -278,29 +279,33 @@ exports.getStoreSubcategory = async (req, res, next) => {
         };
       }
 
+      if(curr.product_id!==null){
       let discountLabel = null;
-    if (curr.discount_id !== null) {
-      if (curr.discount === null) {
-        discountLabel = `Buy ${curr.buy_quantity}, get ${curr.get_quantity}`;
-      } else {
-        if (curr.discount_type === "fixed") {
-          discountLabel = `Buy ${curr.buy_quantity}, get $${curr.discount} off`;
-        } else if (curr.discount_type === "rate") {
-          discountLabel = `Buy ${curr.buy_quantity}, get ${curr.discount}% off`;
+      if (curr.discount_id !== null) {
+        if (curr.discount === null) {
+          discountLabel = `Buy ${curr.buy_quantity}, get ${curr.get_quantity}`;
+        } else {
+          if (curr.discount_type === "fixed") {
+            discountLabel = `Buy ${curr.buy_quantity}, get $${curr.discount} off`;
+          } else if (curr.discount_type === "rate") {
+            discountLabel = `Buy ${curr.buy_quantity}, get ${curr.discount}% off`;
+          }
         }
       }
-    }
 
       acc[subcategoryId].products.push({
         id: curr.product_id,
         title: curr.product_title,
         image: curr.product_image,
-        label:curr.quantity === 1 ? `${curr.quantity_variant} ${curr.unit}`
-              : `${curr.quantity} × ${curr.quantity_variant} ${curr.unit}`,
+        label:
+          curr.quantity === 1
+            ? `${curr.quantity_variant} ${curr.unit}`
+            : `${curr.quantity} × ${curr.quantity_variant} ${curr.unit}`,
         actual_price: curr.actual_price,
         selling_price: curr.selling_price,
-        ...(curr.discount_id !== null && { discount_label: discountLabel })
+        ...(curr.discount_id !== null && { discount_label: discountLabel }),
       });
+    }
       return acc;
     }, {});
 
@@ -408,6 +413,183 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "Internal server error while fetching store inside detail👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getProductsFromSubCategory = async (req, res, next) => {
+  try {
+    const { subcategoryId } = req.params;
+
+    const [subCategoryProducts] = await findProductsOfSubcategory(
+      subcategoryId
+    );
+
+    const subcategoryProductsList = subCategoryProducts[0]
+      ? {
+          subcategory_id: subCategoryProducts[0].subcategory_id,
+          subcategory_name: subCategoryProducts[0].subcategory_name,
+          products: [],
+        }
+      : {
+          subcategory_id: subcategoryId,
+          subcategory_name: "Unknown",
+          products: [],
+        };
+
+    if (subCategoryProducts.length > 0 && subCategoryProducts[0].product_id !== null) {
+      subcategoryProductsList.products = subCategoryProducts.map((product) => {
+        let discountLabel = null;
+        if (product.discount_id !== null) {
+          if (product.discount === null) {
+            discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
+          } else {
+            if (product.discount_type === "fixed") {
+              discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
+            } else if (product.discount_type === "rate") {
+              discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
+            }
+          }
+        }
+        return {
+          id: product.product_id,
+          title: product.product_title,
+          image: product.product_image,
+          label:
+            product.quantity === 1
+              ? `${product.quantity_variant} ${product.unit}`
+              : `${product.quantity} × ${product.quantity_variant} ${product.unit}`,
+          actual_price: product.actual_price,
+          selling_price: product.selling_price,
+          ...(product.discount_id !== null && {
+            discount_label: discountLabel,
+          }),
+        };
+      });
+    } else {
+      subcategoryProductsList.products = ["no products found"];
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: subcategoryProductsList
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching products from subcategory: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching products from subcategory👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getProductsByStoreId = async (req, res, next) => {
+  try {
+    const { storeId } = req.params;
+
+    const [storeProducts] = await findProductsByStoreId(storeId);
+
+    if (!storeProducts || storeProducts.length === 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "No products found for this store",
+        })
+      );
+    }
+
+    const categoryMap = {};
+
+    storeProducts.forEach((product) => {
+      if (!categoryMap[product.category_id]) {
+        categoryMap[product.category_id] = {
+          category_id: product.category_id,
+          category_name: product.category_name,
+          subcategories: {},
+        };
+      }
+
+      if (!categoryMap[product.category_id].subcategories[product.subcategory_id]) {
+        categoryMap[product.category_id].subcategories[product.subcategory_id] = {
+          subcategory_id: product.subcategory_id,
+          subcategory_name: product.subcategory_name,
+          products: [],
+        };
+      }
+
+      if (product.product_id !== null) {
+        let discountLabel = null;
+        if (product.discount_id !== null) {
+          if (product.discount === null) {
+            discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
+          } else {
+            if (product.discount_type === "fixed") {
+              discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
+            } else if (product.discount_type === "rate") {
+              discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
+            }
+          }
+        }
+
+        categoryMap[product.category_id].subcategories[product.subcategory_id].products.push({
+          id: product.product_id,
+          title: product.product_title,
+          image: product.product_image,
+          label:
+            product.quantity === 1
+              ? `${product.quantity_variant} ${product.unit}`
+              : `${product.quantity} × ${product.quantity_variant} ${product.unit}`,
+          actual_price: product.actual_price,
+          selling_price: product.selling_price,
+          ...(product.discount_id !== null && { discount_label: discountLabel }),
+        });
+      }
+    });
+
+    const categoryList = Object.values(categoryMap).map((category) => ({
+      category_id: category.category_id,
+      category_name: category.category_name,
+      subcategories: Object.values(category.subcategories),
+    }));
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: categoryList,
+        msg: "Products fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching products by store: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching products by store",
       })
     );
   }

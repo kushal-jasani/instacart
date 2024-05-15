@@ -232,6 +232,79 @@ GROUP BY
   );
 };
 
+const findProductsOfSubcategory=async(subcategoryId)=>{
+  const query=`
+  SELECT 
+    sps.id AS subcategory_id,
+    sps.name AS subcategory_name,
+    p.id AS product_id,
+    p.title AS product_title,
+    (SELECT pi.image from images pi WHERE p.id = pi.product_id LIMIT 1) AS product_image,
+    pq.quantity AS quantity,
+    pq.quantity_varient AS quantity_variant,
+    pq.unit AS unit,
+    pq.actual_price AS actual_price,
+    pq.selling_price AS selling_price,
+    p.discount_id,
+    d.buy_quantity,
+    d.get_quantity,
+    d.discount_type,
+    d.discount
+FROM 
+    store_products_subcategories sps
+LEFT JOIN 
+    products p ON sps.id = p.subcategory_id
+LEFT JOIN 
+    discounts d ON p.discount_id = d.id
+LEFT JOIN 
+    product_quantity pq ON p.id = pq.product_id
+WHERE 
+    sps.id = ?
+GROUP BY 
+    sps.id,sps.name, p.id, p.title, p.description, p.ingredients, p.directions, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, p.discount_id, d.buy_quantity, d.get_quantity, d.discount_type, d.discount
+`
+  return await db.query(query, [subcategoryId]);
+}
+
+const findProductsByStoreId = async (storeId) => {
+  const query = `
+    SELECT 
+      sc.id AS category_id,
+      sc.name AS category_name,
+      sps.id AS subcategory_id,
+      sps.name AS subcategory_name,
+      p.id AS product_id,
+      p.title AS product_title,
+      (SELECT pi.image from images pi WHERE p.id = pi.product_id LIMIT 1) AS product_image,
+      pq.quantity AS quantity,
+      pq.quantity_varient AS quantity_variant,
+      pq.unit AS unit,
+      pq.actual_price AS actual_price,
+      pq.selling_price AS selling_price,
+      p.discount_id,
+      d.buy_quantity,
+      d.get_quantity,
+      d.discount_type,
+      d.discount
+    FROM 
+      store_products_categories sc
+    LEFT JOIN 
+      store_products_subcategories sps ON sc.id = sps.category_id
+    LEFT JOIN 
+      products p ON sps.id = p.subcategory_id
+    LEFT JOIN 
+      discounts d ON p.discount_id = d.id
+    LEFT JOIN 
+      product_quantity pq ON p.id = pq.product_id
+    WHERE 
+      sc.store_id = ?
+    GROUP BY 
+      sc.id, sc.name, sps.id, sps.name, p.id, p.title, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, p.discount_id, d.buy_quantity, d.get_quantity, d.discount_type, d.discount
+  `;
+  return await db.query(query, [storeId]);
+}
+
+
 const formatDeliveryFee = (df) => {
   if (df.has_priority_avail) {
     var priorityFeeMsg = `Priority delivery: An additional $${df.additional_charge} will be charged.`;
@@ -432,4 +505,6 @@ module.exports = {
   formatHours,
   deliveryTimings,
   findSubCategoryOfStore,
+  findProductsOfSubcategory,
+  findProductsByStoreId
 };
