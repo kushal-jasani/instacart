@@ -111,53 +111,43 @@ exports.getStoresByCategory = async (req, res, next) => {
         })
       );
     }
+    const storeIds = stores.map(store => store.id);
+    const [inStorePrices] = await checkInStorePrices(storeIds);
+    const { todayRows, tomorrowRows } = await getNextDeliveryTime(storeIds);
 
-    const singleResData = [];
-    const responseData = await Promise.all(
-      stores.map(async (store) => {
+
+    const singleResData=stores.map(store => {
         const messages = [];
-        // Check if in-store prices are available
-        const inStorePrices = await checkInStorePrices(store.id);
-        if (inStorePrices) {
-          messages.push("In-store prices available");
+        
+        const inStorePrice = inStorePrices.find(price => price.store_id === store.id);
+        if (inStorePrice) {
+        messages.push("In-store prices available");
         }
 
-        // Check if pickup is available
         if (store.is_pickup_avail) {
           messages.push("Pickup available");
         }
 
-        // Check for next possible delivery time
-        const deliveryBy = await getNextDeliveryTime(store.id);
-        if (deliveryBy) {
-          messages.push(`Delivery by ${deliveryBy}`);
+        const todayDelivery = todayRows.find(row => row.store_id === store.id);
+        const tomorrowDelivery = tomorrowRows.find(row => row.store_id === store.id);
+  
+        if (todayDelivery) {
+          const todayUpperSlot = todayDelivery.time_slot.split(" - ")[1];
+          messages.push(`Delivery by Today, ${todayUpperSlot}`);
+        } else if (tomorrowDelivery) {
+          const tomorrowUpperSlot = tomorrowDelivery.time_slot.split(" - ")[1];
+          messages.push(`Delivery by Tomorrow, ${tomorrowUpperSlot}`);
         }
+        
 
-        singleResData.push({
+        return{
           store_id: store.id,
           store_name: store.name,
           image_url: store.logo,
           store_categories: store.store_categories,
           messages,
-        });
+        };
       })
-    );
-
-    // const currentTime = new Date();
-    // const storeData = stores.map(store => {
-    //     let msg = "";
-    //     if (store.is_instore === 1) {
-    //         msg = "In-store prices available";
-    //     } else {
-    //         const nextDeliveryTime = getNextDeliveryTime(store.id, currentTime);
-    //         msg = `Next delivery available at ${nextDeliveryTime}`;
-    //     }
-    //     return {
-    //         id: store.id,
-    //         name: store.name,
-    //         msg: msg
-    //     };
-    // });
 
     return sendHttpResponse(
       req,
