@@ -3,7 +3,7 @@ const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 exports.getProductDetail=async(req,res,next)=>{
     try{
-        const { productId } = req.body;
+        const { productId } = req.params;
         const userId=req.user.userId; 
         const [productResults]=await findProductDetail(productId,userId);
 
@@ -94,7 +94,7 @@ exports.getProductDetail=async(req,res,next)=>{
 
 exports.addToSavedProduct = async (req, res, next) => {
     try {
-      const productId = req.params.productId;
+      const productId = req.body.productId;
       const userId = req.user.userId;
       const [existsInFavourite]=await productExistsInSaved(productId,userId);
       if(existsInFavourite.length>0){
