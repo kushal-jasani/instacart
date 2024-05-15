@@ -1,11 +1,11 @@
-const { findProductDetail } = require("../repository/products");
+const { findProductDetail, productExistsInSaved, insertIntoSaved, deleteFromSavedList } = require("../repository/products");
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 exports.getProductDetail=async(req,res,next)=>{
     try{
         const { productId } = req.params;
-
-        const [productResults]=await findProductDetail(productId);
+        const userId=req.user.userId; 
+        const [productResults]=await findProductDetail(productId,userId);
 
         if (!productResults|| productResults.length == 0) {
             return sendHttpResponse(
@@ -37,12 +37,12 @@ exports.getProductDetail=async(req,res,next)=>{
         let perUnitPrice = null;
         if (product.quantity == 1 && product.unit) {
             if (product.unit === 'ct' || product.unit === 'each' ) {
-                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ 'each'; 
+                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ' each'; 
             } else if (product.unit === 'g' ) {
-                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2) + '/100 g'; 
+                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2) + '/ 100 g'; 
             } 
             else if (product.unit==='kg') {
-                perUnitPrice = (product.selling_price / (product.quantity_varient*10)).toFixed(2) + '/100 g'; 
+                perUnitPrice = (product.selling_price / (product.quantity_varient*10)).toFixed(2) + '/ 100 g'; 
             }else{
                 perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ` / ${product.unit}`; 
             }
@@ -60,7 +60,8 @@ exports.getProductDetail=async(req,res,next)=>{
             actual_price: product.actual_price,
             selling_price: product.selling_price,
             ...(perUnitPrice !== null && { per_unit_price: perUnitPrice }),
-            ...(product.discount_id !== null && { discount_label: discountLabel })
+            ...(product.discount_id !== null && { discount_label: discountLabel }),
+            is_saved:product.is_saved
         };
 
         return sendHttpResponse(
@@ -90,3 +91,90 @@ exports.getProductDetail=async(req,res,next)=>{
     );
     }
 }
+
+exports.addToSavedProduct = async (req, res, next) => {
+    try {
+      const productId = req.params.productId;
+      const userId = req.user.userId;
+      const [existsInFavourite]=await productExistsInSaved(productId,userId);
+      if(existsInFavourite.length>0){
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: "product already exists in saved products",
+          })
+        );
+      }
+      const [insertResult] = await insertIntoSaved(productId, userId);
+      if (!insertResult) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: "failed to add product to saved",
+          })
+        );
+      }
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          statusCode: 200,
+          status: "success",
+          msg: "product added to saved product list successfully❤️",
+        })
+      );
+    } catch (error) {
+      console.log("error while posting to saved products:", error);
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 500,
+          msg: "internal server error while posting to saved products👨🏻‍🔧",
+        })
+      );
+    }
+  };
+  
+  exports.removeFromSavedProducts = async (req, res, next) => {
+    try {
+      const productId=req.params.productId;
+      const userId = req.user.userId;
+  
+      await deleteFromSavedList(productId,userId);
+    
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          statusCode: 200,
+          status: "success",
+          msg: "product removed from favourites successfully",
+        })
+      );
+    } catch (error) {
+      console.log("error while removeing product from favourites :", error);
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 500,
+          msg: "internal server error while removeing product favourites",
+        })
+      );
+    }
+  };
