@@ -5,7 +5,7 @@ const {isAuth}=require('../middleware/is-auth')
 const productController=require('../controller/products');
 
 router.get('/:productId',checkLoggedIn,isAuth,productController.getProductDetail);
-router.post('/addtosaved/:productId',checkLoggedIn,isAuth,productController.addToSavedProduct);
+router.post('/addtosaved',checkLoggedIn,isAuth,productController.addToSavedProduct);
 router.delete('/saved/remove/:productId',checkLoggedIn,isAuth,productController.removeFromSavedProducts);
 
 module.exports=router;
