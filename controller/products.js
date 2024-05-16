@@ -1,5 +1,6 @@
-const { findProductDetail, productExistsInSaved, insertIntoSaved, deleteFromSavedList } = require("../repository/products");
+const { findProductDetail, productExistsInSaved, insertIntoSaved, deleteFromSavedList, generatePerUnitPrice } = require("../repository/products");
 const { generateResponse, sendHttpResponse } = require("../helper/response");
+const { generateDiscountLabel } = require("../repository/store");
 
 exports.getProductDetail=async(req,res,next)=>{
     try{
@@ -20,34 +21,8 @@ exports.getProductDetail=async(req,res,next)=>{
             );
           }
 
-          const product = productResults[0];
-          let discountLabel = null;
-        if (product.discount_id !== null) {
-            if (product.discount === null) {
-                discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
-            } else {
-                if (product.discount_type === 'fixed') {
-                    discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
-                } else if (product.discount_type === 'rate') {
-                    discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
-                }
-            }
-        }
-
-        let perUnitPrice = null;
-        if (product.quantity == 1 && product.unit) {
-            if (product.unit === 'ct' || product.unit === 'each' ) {
-                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ' each'; 
-            } else if (product.unit === 'g' ) {
-                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2) + '/ 100 g'; 
-            } 
-            else if (product.unit==='kg') {
-                perUnitPrice = (product.selling_price / (product.quantity_varient*10)).toFixed(2) + '/ 100 g'; 
-            }else{
-                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ` / ${product.unit}`; 
-            }
-        }
-       
+        const product = productResults[0];
+  
         const responseObject = {
             product_id: product.product_id,
             product_title: product.product_title,
@@ -59,8 +34,8 @@ exports.getProductDetail=async(req,res,next)=>{
               : `${product.quantity} × ${product.quantity_varient} ${product.unit}`,
             actual_price: product.actual_price,
             selling_price: product.selling_price,
-            ...(perUnitPrice !== null && { per_unit_price: perUnitPrice }),
-            ...(product.discount_id !== null && { discount_label: discountLabel }),
+            ...(generatePerUnitPrice(product) !== null && { per_unit_price: generatePerUnitPrice(product) }),
+            ...(product.discount_id !== null && { discount_label: generateDiscountLabel(product) }),
             is_saved:product.is_saved
         };
 
@@ -72,7 +47,7 @@ exports.getProductDetail=async(req,res,next)=>{
                 status: "success",
                 statusCode: 200,
                 data: responseObject,
-                msg: "Product details fetched successfully",
+                msg: "Product details fetched successfully✅",
             })
         );
 
@@ -105,7 +80,7 @@ exports.addToSavedProduct = async (req, res, next) => {
           generateResponse({
             status: "error",
             statusCode: 400,
-            msg: "product already exists in saved products",
+            msg: "Product already exists in saved products👀",
           })
         );
       }
@@ -118,7 +93,7 @@ exports.addToSavedProduct = async (req, res, next) => {
           generateResponse({
             status: "error",
             statusCode: 400,
-            msg: "failed to add product to saved",
+            msg: "Failed to add product to saved",
           })
         );
       }
@@ -129,7 +104,7 @@ exports.addToSavedProduct = async (req, res, next) => {
         generateResponse({
           statusCode: 200,
           status: "success",
-          msg: "product added to saved product list successfully❤️",
+          msg: "Product added to saved product list successfully❤️",
         })
       );
     } catch (error) {
@@ -161,11 +136,11 @@ exports.addToSavedProduct = async (req, res, next) => {
         generateResponse({
           statusCode: 200,
           status: "success",
-          msg: "product removed from favourites successfully",
+          msg: "Product removed from saved list successfully",
         })
       );
     } catch (error) {
-      console.log("error while removeing product from favourites :", error);
+      console.log("error while removeing product from saved list :", error);
       return sendHttpResponse(
         req,
         res,
@@ -173,7 +148,7 @@ exports.addToSavedProduct = async (req, res, next) => {
         generateResponse({
           status: "error",
           statusCode: 500,
-          msg: "internal server error while removeing product favourites",
+          msg: "internal server error while removeing product saved list👨🏻‍🔧",
         })
       );
     }

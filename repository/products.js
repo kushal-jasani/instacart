@@ -59,4 +59,21 @@ const productExistsInSaved=async(productId,userId)=>{
 const deleteFromSavedList=async(productId,userId)=>{
     return await db.query('delete from saved_products where product_id=? && user_id=?',[productId,userId])
   }
-module.exports={findProductDetail,insertIntoSaved,productExistsInSaved,deleteFromSavedList}
+
+const generatePerUnitPrice=(product)=>{
+    let perUnitPrice = null;
+        if (product.quantity == 1 && product.unit) {
+            if (product.unit === 'ct' || product.unit === 'each' ) {
+                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ' each'; 
+            } else if (product.unit === 'g' ) {
+                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2) + '/ 100 g'; 
+            } 
+            else if (product.unit==='kg') {
+                perUnitPrice = (product.selling_price / (product.quantity_varient*10)).toFixed(2) + '/ 100 g'; 
+            }else{
+                perUnitPrice = (product.selling_price / product.quantity_varient).toFixed(2)+ ` / ${product.unit}`; 
+            }
+        }
+        return perUnitPrice
+}
+module.exports={findProductDetail,insertIntoSaved,productExistsInSaved,deleteFromSavedList,generatePerUnitPrice}
