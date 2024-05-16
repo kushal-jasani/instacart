@@ -13,4 +13,8 @@ router.get('/collection/subcategory/:subcategoryId',storeController.getProductsF
 
 router.get('/collection/store/:storeId',storeController.getProductsByStoreId);
 
+router.get('/search',storeController.search)
+router.get('/inside/search',storeController.searchInsideStore)
+
+
 module.exports=router;

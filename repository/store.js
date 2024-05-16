@@ -59,10 +59,9 @@ const getNextDeliveryTime = async (storeIds) => {
     currentTime,
   ]);
 
-  
   const nextDay = (currentDay + 1) % 7;
   const [tomorrowRows] = await db.query(tomorrowQuery, [storeIds, nextDay]);
-  return {todayRows,tomorrowRows}
+  return { todayRows, tomorrowRows };
 };
 
 const getStoresOpenAfterEleven = async () => {
@@ -225,8 +224,8 @@ GROUP BY
   );
 };
 
-const findProductsOfSubcategory=async(subcategoryId)=>{
-  const query=`
+const findProductsOfSubcategory = async (subcategoryId) => {
+  const query = `
   SELECT 
     sps.id AS subcategory_id,
     sps.name AS subcategory_name,
@@ -255,9 +254,9 @@ WHERE
     sps.id = ?
 GROUP BY 
     sps.id,sps.name, p.id, p.title, p.description, p.ingredients, p.directions, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, p.discount_id, d.buy_quantity, d.get_quantity, d.discount_type, d.discount
-`
+`;
   return await db.query(query, [subcategoryId]);
-}
+};
 
 const findProductsByStoreId = async (storeId) => {
   const query = `
@@ -295,8 +294,65 @@ const findProductsByStoreId = async (storeId) => {
       sc.id, sc.name, sps.id, sps.name, p.id, p.title, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, p.discount_id, d.buy_quantity, d.get_quantity, d.discount_type, d.discount
   `;
   return await db.query(query, [storeId]);
+};
+
+const findStoresByName = async (searchQuery) => {
+  const sql = `
+  SELECT id AS store_id, name AS store_name, logo AS store_logo
+  FROM store
+  WHERE name LIKE ?
+`;
+  const [stores] = await db.query(sql, [`%${searchQuery}%`]);
+  return stores;
+};
+
+const findProductsByTitle = async (searchQuery) => {
+  const sql = `
+    SELECT p.id, p.store_id, p.category_id, p.subcategory_id, p.discount_id, p.title ,(SELECT i.image FROM images i WHERE  p.id = i.product_id LIMIT 1)AS image
+    FROM products p
+    WHERE title LIKE ?
+  `;
+  const [products] = await db.query(sql, [`%${searchQuery}%`]);
+  return products;
+};
+
+const findProductsByTitleAndStoreId=async(searchQuery,storeId)=>{
+  const sql = `
+    SELECT p.id AS product_id, 
+    p.store_id AS store_id,
+    p.category_id AS category_id,
+    p.subcategory_id AS subcategory_id,
+    p.discount_id,
+    p.title AS product_title,
+    (SELECT pi.image from images pi WHERE p.id = pi.product_id LIMIT 1) AS product_image,
+    pq.quantity AS quantity,
+    pq.quantity_varient AS quantity_variant,
+    pq.unit AS unit,
+    pq.actual_price AS actual_price,
+    pq.selling_price AS selling_price,
+    d.buy_quantity,
+    d.get_quantity,
+    d.discount_type,
+    d.discount
+    FROM products p
+    LEFT JOIN 
+      discounts d ON p.discount_id = d.id
+    LEFT JOIN 
+      product_quantity pq ON p.id = pq.product_id
+    WHERE p.title LIKE ? AND p.store_id = ?
+  `;
+  const [products] = await db.query(sql, [`%${searchQuery}%`,storeId]);
+  return products;
 }
 
+const findStoresByIds=async(storeIds)=>{
+  const sql=`
+  SELECT id,name,logo
+  FROM store
+  WHERE id IN (?);`
+  const [stores]=await db.query(sql,[storeIds]);
+  return stores
+}
 
 const formatDeliveryFee = (df) => {
   if (df.has_priority_avail) {
@@ -481,6 +537,20 @@ const deliveryTimings = (deliveryTimings) => {
   return modifiedTimings;
 };
 
+const generateDiscountLabel=(product)=>{
+  let discountLabel = null;
+  if (product.discount === null) {
+    discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
+  } else {
+    if (product.discount_type === "fixed") {
+      discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
+    } else if (product.discount_type === "rate") {
+      discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
+    }
+  }
+  return discountLabel;
+}
+
 module.exports = {
   getMainCategories,
   getAllStores,
@@ -491,13 +561,18 @@ module.exports = {
   getStoreByCategory,
   findStoreFrontDetails,
   findStoreInsideDetails,
+  findStoresByIds,
+  findProductsByTitleAndStoreId,
   formatDeliveryFee,
   formatServiceFee,
   formatBagFee,
   getNextDeliverySlot,
+  findStoresByName,
+  findProductsByTitle,
   formatHours,
   deliveryTimings,
   findSubCategoryOfStore,
   findProductsOfSubcategory,
-  findProductsByStoreId
+  findProductsByStoreId,
+  generateDiscountLabel
 };

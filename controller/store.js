@@ -18,6 +18,11 @@ const {
   findSubCategoryOfStore,
   findProductsOfSubcategory,
   findProductsByStoreId,
+  findStoresByName,
+  findProductsByTitle,
+  findStoresByIds,
+  findProductsByTitleAndStoreId,
+  generateDiscountLabel,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -111,43 +116,45 @@ exports.getStoresByCategory = async (req, res, next) => {
         })
       );
     }
-    const storeIds = stores.map(store => store.id);
+    const storeIds = stores.map((store) => store.id);
     const [inStorePrices] = await checkInStorePrices(storeIds);
     const { todayRows, tomorrowRows } = await getNextDeliveryTime(storeIds);
 
+    const singleResData = stores.map((store) => {
+      const messages = [];
 
-    const singleResData=stores.map(store => {
-        const messages = [];
-        
-        const inStorePrice = inStorePrices.find(price => price.store_id === store.id);
-        if (inStorePrice) {
+      const inStorePrice = inStorePrices.find(
+        (price) => price.store_id === store.id
+      );
+      if (inStorePrice) {
         messages.push("In-store prices available");
-        }
+      }
 
-        if (store.is_pickup_avail) {
-          messages.push("Pickup available");
-        }
+      if (store.is_pickup_avail) {
+        messages.push("Pickup available");
+      }
 
-        const todayDelivery = todayRows.find(row => row.store_id === store.id);
-        const tomorrowDelivery = tomorrowRows.find(row => row.store_id === store.id);
-  
-        if (todayDelivery) {
-          const todayUpperSlot = todayDelivery.time_slot.split(" - ")[1];
-          messages.push(`Delivery by Today, ${todayUpperSlot}`);
-        } else if (tomorrowDelivery) {
-          const tomorrowUpperSlot = tomorrowDelivery.time_slot.split(" - ")[1];
-          messages.push(`Delivery by Tomorrow, ${tomorrowUpperSlot}`);
-        }
-        
+      const todayDelivery = todayRows.find((row) => row.store_id === store.id);
+      const tomorrowDelivery = tomorrowRows.find(
+        (row) => row.store_id === store.id
+      );
 
-        return{
-          store_id: store.id,
-          store_name: store.name,
-          image_url: store.logo,
-          store_categories: store.store_categories,
-          messages,
-        };
-      })
+      if (todayDelivery) {
+        const todayUpperSlot = todayDelivery.time_slot.split(" - ")[1];
+        messages.push(`Delivery by Today, ${todayUpperSlot}`);
+      } else if (tomorrowDelivery) {
+        const tomorrowUpperSlot = tomorrowDelivery.time_slot.split(" - ")[1];
+        messages.push(`Delivery by Tomorrow, ${tomorrowUpperSlot}`);
+      }
+
+      return {
+        store_id: store.id,
+        store_name: store.name,
+        image_url: store.logo,
+        store_categories: store.store_categories,
+        messages,
+      };
+    });
 
     return sendHttpResponse(
       req,
@@ -156,7 +163,7 @@ exports.getStoresByCategory = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        msg: "Stores retrieved successfully.",
+        msg: "Stores retrieved successfully.✅",
         data: singleResData,
       })
     );
@@ -221,7 +228,7 @@ exports.getStoreDetailsFront = async (req, res, next) => {
         status: "success",
         statusCode: 200,
         data: response,
-        msg: "Store front details fetched successfully",
+        msg: "Store front details fetched successfully🔥",
       })
     );
   } catch (error) {
@@ -269,33 +276,33 @@ exports.getStoreSubcategory = async (req, res, next) => {
         };
       }
 
-      if(curr.product_id!==null){
-      let discountLabel = null;
-      if (curr.discount_id !== null) {
-        if (curr.discount === null) {
-          discountLabel = `Buy ${curr.buy_quantity}, get ${curr.get_quantity}`;
-        } else {
-          if (curr.discount_type === "fixed") {
-            discountLabel = `Buy ${curr.buy_quantity}, get $${curr.discount} off`;
-          } else if (curr.discount_type === "rate") {
-            discountLabel = `Buy ${curr.buy_quantity}, get ${curr.discount}% off`;
+      if (curr.product_id !== null) {
+        let discountLabel = null;
+        if (curr.discount_id !== null) {
+          if (curr.discount === null) {
+            discountLabel = `Buy ${curr.buy_quantity}, get ${curr.get_quantity}`;
+          } else {
+            if (curr.discount_type === "fixed") {
+              discountLabel = `Buy ${curr.buy_quantity}, get $${curr.discount} off`;
+            } else if (curr.discount_type === "rate") {
+              discountLabel = `Buy ${curr.buy_quantity}, get ${curr.discount}% off`;
+            }
           }
         }
-      }
 
-      acc[subcategoryId].products.push({
-        id: curr.product_id,
-        title: curr.product_title,
-        image: curr.product_image,
-        label:
-          curr.quantity === 1
-            ? `${curr.quantity_variant} ${curr.unit}`
-            : `${curr.quantity} × ${curr.quantity_variant} ${curr.unit}`,
-        actual_price: curr.actual_price,
-        selling_price: curr.selling_price,
-        ...(curr.discount_id !== null && { discount_label: discountLabel }),
-      });
-    }
+        acc[subcategoryId].products.push({
+          id: curr.product_id,
+          title: curr.product_title,
+          image: curr.product_image,
+          label:
+            curr.quantity === 1
+              ? `${curr.quantity_variant} ${curr.unit}`
+              : `${curr.quantity} × ${curr.quantity_variant} ${curr.unit}`,
+          actual_price: curr.actual_price,
+          selling_price: curr.selling_price,
+          ...(curr.discount_id !== null && { discount_label: discountLabel }),
+        });
+      }
       return acc;
     }, {});
 
@@ -309,7 +316,7 @@ exports.getStoreSubcategory = async (req, res, next) => {
         status: "success",
         statusCode: 200,
         data: responseArray,
-        msg: "Subcategory and products details fetched successfully",
+        msg: "Subcategory and products details fetched successfully✅",
       })
     );
   } catch (error) {
@@ -390,7 +397,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         status: "success",
         statusCode: 200,
         data: response,
-        msg: "Store-Inside details fetched successfully",
+        msg: "Store-Inside details fetched successfully⚡️",
       })
     );
   } catch (error) {
@@ -428,20 +435,11 @@ exports.getProductsFromSubCategory = async (req, res, next) => {
           products: [],
         };
 
-    if (subCategoryProducts.length > 0 && subCategoryProducts[0].product_id !== null) {
+    if (
+      subCategoryProducts.length > 0 &&
+      subCategoryProducts[0].product_id !== null
+    ) {
       subcategoryProductsList.products = subCategoryProducts.map((product) => {
-        let discountLabel = null;
-        if (product.discount_id !== null) {
-          if (product.discount === null) {
-            discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
-          } else {
-            if (product.discount_type === "fixed") {
-              discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
-            } else if (product.discount_type === "rate") {
-              discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
-            }
-          }
-        }
         return {
           id: product.product_id,
           title: product.product_title,
@@ -453,7 +451,7 @@ exports.getProductsFromSubCategory = async (req, res, next) => {
           actual_price: product.actual_price,
           selling_price: product.selling_price,
           ...(product.discount_id !== null && {
-            discount_label: discountLabel,
+            discount_label: generateDiscountLabel(product),
           }),
         };
       });
@@ -468,7 +466,7 @@ exports.getProductsFromSubCategory = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: subcategoryProductsList
+        data: subcategoryProductsList,
       })
     );
   } catch (error) {
@@ -500,7 +498,7 @@ exports.getProductsByStoreId = async (req, res, next) => {
         generateResponse({
           status: "error",
           statusCode: 404,
-          msg: "No products found for this store",
+          msg: "No products found for this store🙁",
         })
       );
     }
@@ -516,29 +514,21 @@ exports.getProductsByStoreId = async (req, res, next) => {
         };
       }
 
-      if (!categoryMap[product.category_id].subcategories[product.subcategory_id]) {
-        categoryMap[product.category_id].subcategories[product.subcategory_id] = {
-          subcategory_id: product.subcategory_id,
-          subcategory_name: product.subcategory_name,
-          products: [],
-        };
+      if (
+        !categoryMap[product.category_id].subcategories[product.subcategory_id]
+      ) {
+        categoryMap[product.category_id].subcategories[product.subcategory_id] =
+          {
+            subcategory_id: product.subcategory_id,
+            subcategory_name: product.subcategory_name,
+            products: [],
+          };
       }
 
       if (product.product_id !== null) {
-        let discountLabel = null;
-        if (product.discount_id !== null) {
-          if (product.discount === null) {
-            discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
-          } else {
-            if (product.discount_type === "fixed") {
-              discountLabel = `Buy ${product.buy_quantity}, get $${product.discount} off`;
-            } else if (product.discount_type === "rate") {
-              discountLabel = `Buy ${product.buy_quantity}, get ${product.discount}% off`;
-            }
-          }
-        }
-
-        categoryMap[product.category_id].subcategories[product.subcategory_id].products.push({
+        categoryMap[product.category_id].subcategories[
+          product.subcategory_id
+        ].products.push({
           id: product.product_id,
           title: product.product_title,
           image: product.product_image,
@@ -548,7 +538,9 @@ exports.getProductsByStoreId = async (req, res, next) => {
               : `${product.quantity} × ${product.quantity_variant} ${product.unit}`,
           actual_price: product.actual_price,
           selling_price: product.selling_price,
-          ...(product.discount_id !== null && { discount_label: discountLabel }),
+          ...(product.discount_id !== null && {
+            discount_label: generateDiscountLabel(product),
+          }),
         });
       }
     });
@@ -567,7 +559,7 @@ exports.getProductsByStoreId = async (req, res, next) => {
         status: "success",
         statusCode: 200,
         data: categoryList,
-        msg: "Products fetched successfully",
+        msg: "Products fetched successfully🚀",
       })
     );
   } catch (error) {
@@ -579,7 +571,133 @@ exports.getProductsByStoreId = async (req, res, next) => {
       generateResponse({
         status: "error",
         statusCode: 500,
-        msg: "Internal server error while fetching products by store",
+        msg: "Internal server error while fetching products by store👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.search = async (req, res, next) => {
+  try {
+    const { query } = req.query;
+    const stores = await findStoresByName(query);
+    const products = await findProductsByTitle(query);
+
+    if((!stores || stores.length==0) && (!products || products.length==0)){
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: `No results for '${query}' 🙁`,
+        })
+      );
+    }
+
+    const storeIdsWithMatchingProducts = products.map(
+      (product) => product.store_id
+    );
+    const storesWithMatchingProducts = await findStoresByIds(
+      storeIdsWithMatchingProducts
+    );
+
+    const matchingStores = stores;
+    const matchingProducts = storesWithMatchingProducts.map((store) => ({
+      store_id: store.id,
+      store_name: store.name,
+      store_logo: store.logo,
+      products: products
+        .filter((product) => product.store_id === store.id)
+        .map((product) => ({
+          id: product.id,
+          title: product.title,
+          image: product.image,
+        })),
+      total_products: products.length,
+    }));
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: { matchingStores, matchingProducts },
+        msg: "Products and Store Data fetched for given search✅",
+      })
+    );
+  } catch (error) {
+    console.log("Error while searching : ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while searching👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.searchInsideStore = async (req, res, next) => {
+  try {
+    const { storeId, query } = req.query;
+    const products = await findProductsByTitleAndStoreId(query, storeId);
+
+    if (!products || products.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: `No results for '${query}' 🙁`,
+        })
+      );
+    }
+
+    const response = products.map((product) => ({
+      id: product.product_id,
+      title: product.product_title,
+      image: product.product_image,
+      label:
+        product.quantity === 1
+          ? `${product.quantity_variant} ${product.unit}`
+          : `${product.quantity} × ${product.quantity_variant} ${product.unit}`,
+      actual_price: product.actual_price,
+      selling_price: product.selling_price,
+      ...(product.discount_id !== null && {
+        discount_label: generateDiscountLabel(product),
+      }),
+    }));
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: response,
+        msg: "Products Data fetched for given search✅",
+      })
+    );
+  } catch (error) {
+    console.log("Error while searching inside store : ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while searching inside store👨🏻‍🔧",
       })
     );
   }
