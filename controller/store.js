@@ -370,7 +370,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         decrtiption: store.policy_description,
       },
       delivery_time: {
-        next_delivery: getNextDeliverySlot(store.delivery_timings),
+        next_delivery: getNextDeliverySlot(store.delivery_timings,store.priority_delivery_timings),
         delivery_timings: deliveryTimings(store.delivery_timings),
       },
       ...(store.is_pickup_avail === 1

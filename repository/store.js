@@ -150,8 +150,12 @@ const findStoreInsideDetails = async (store_id) => {
   sf.max_percentage,
   sf.min_value,
   sf.per_item_charge,
-  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', so.day, 'time_slot', so.time_slot))FROM store_opening so WHERE s.id = so.store_id)AS store_opening_info,
-  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot,'price',df.charge))FROM timing to1 WHERE s.id = to1.store_id AND to1.is_delivery_time=1)AS delivery_timings,
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot, 'type', 'standard', 'price', df.charge))
+  FROM timing to1 LEFT JOIN delivery_fee df ON to1.store_id = df.store_id
+  WHERE s.id = to1.store_id AND to1.is_delivery_time=1) AS delivery_timings,
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot, 'type', 'priority', 'price', df.charge + df.additional_charge))
+  FROM timing to1 LEFT JOIN delivery_fee df ON to1.store_id = df.store_id
+  WHERE s.id = to1.store_id AND to1.is_delivery_time=1 AND df.has_priority_avail = 1) AS priority_delivery_timings,
   (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot,'price',df.charge))FROM timing to1 WHERE s.id = to1.store_id AND to1.is_pickup_time=1)AS pickup_timings
 FROM 
   store s
@@ -316,7 +320,7 @@ const findProductsByTitle = async (searchQuery) => {
   return products;
 };
 
-const findProductsByTitleAndStoreId=async(searchQuery,storeId)=>{
+const findProductsByTitleAndStoreId = async (searchQuery, storeId) => {
   const sql = `
     SELECT p.id AS product_id, 
     p.store_id AS store_id,
@@ -341,18 +345,18 @@ const findProductsByTitleAndStoreId=async(searchQuery,storeId)=>{
       product_quantity pq ON p.id = pq.product_id
     WHERE p.title LIKE ? AND p.store_id = ?
   `;
-  const [products] = await db.query(sql, [`%${searchQuery}%`,storeId]);
+  const [products] = await db.query(sql, [`%${searchQuery}%`, storeId]);
   return products;
-}
+};
 
-const findStoresByIds=async(storeIds)=>{
-  const sql=`
+const findStoresByIds = async (storeIds) => {
+  const sql = `
   SELECT id,name,logo
   FROM store
-  WHERE id IN (?);`
-  const [stores]=await db.query(sql,[storeIds]);
-  return stores
-}
+  WHERE id IN (?);`;
+  const [stores] = await db.query(sql, [storeIds]);
+  return stores;
+};
 
 const formatDeliveryFee = (df) => {
   if (df.has_priority_avail) {
@@ -407,7 +411,7 @@ const convertTo24Hour = (time) => {
   );
 };
 
-const getNextDeliverySlot = (deliveryTimings) => {
+const getNextDeliverySlot = (deliveryTimings,priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length == 0) {
     return "not available";
   }
@@ -418,52 +422,73 @@ const getNextDeliverySlot = (deliveryTimings) => {
   var currentMinutes = currentTime.getMinutes();
   var currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
-  for (var i = 0; i < deliveryTimings.length; i++) {
-    var deliveryTime = deliveryTimings[i];
-    var timeSlotParts = deliveryTime.time_slot.split(" - ");
-    var startTime = convertTo24Hour(timeSlotParts[0]);
-    var endTime = convertTo24Hour(timeSlotParts[1]);
-    var startTimeParts = startTime.split(":");
-    var endTimeParts = endTime.split(":");
+  const findNextSlot = (timings, type) => {
+    for (let i = 0; i < timings.length; i++) {
+      const deliveryTime = timings[i];
+      const timeSlotParts = deliveryTime.time_slot.split(" - ");
+      const startTime = convertTo24Hour(timeSlotParts[0]);
+      const endTime = convertTo24Hour(timeSlotParts[1]);
+      const startTimeParts = startTime.split(":");
+      const endTimeParts = endTime.split(":");
 
-    var startHours = parseInt(startTimeParts[0]);
-    var startMinutes = parseInt(startTimeParts[1]);
-    var endHours = parseInt(endTimeParts[0]);
-    var endMinutes = parseInt(endTimeParts[1]);
+      const startHours = parseInt(startTimeParts[0]);
+      const startMinutes = parseInt(startTimeParts[1]);
+      const endHours = parseInt(endTimeParts[0]);
+      const endMinutes = parseInt(endTimeParts[1]);
 
-    var startTimeInMinutes = startHours * 60 + startMinutes;
-    var endTimeInMinutes = endHours * 60 + endMinutes;
-    if (parseInt(deliveryTime.day) === today) {
-      // Check if the current time falls within this time slot
-      if (
-        currentTimeInMinutes >= startTimeInMinutes &&
-        currentTimeInMinutes < endTimeInMinutes
-      ) {
-        // Find the next time slot after the current time
-        if (i < deliveryTimings.length - 1) {
-          var nextDeliveryTime = deliveryTimings[i + 1];
-          return { day: "Today", timeSlot: nextDeliveryTime.time_slot };
-        } else {
-          // If there are no more time slots for today, return the first time slot of tomorrow
-          var nextDay = today === 6 ? 0 : today + 1;
-          for (var j = 0; j < deliveryTimings.length; j++) {
-            if (parseInt(deliveryTimings[j].day) === nextDay) {
-              return {
-                day: "Tomorrow",
-                timeSlot: deliveryTimings[j].time_slot,
-              };
+      const startTimeInMinutes = startHours * 60 + startMinutes;
+      const endTimeInMinutes = endHours * 60 + endMinutes;
+
+      if (parseInt(deliveryTime.day) === today) {
+        if (
+          currentTimeInMinutes >= startTimeInMinutes &&
+          currentTimeInMinutes < endTimeInMinutes
+        ) {
+          if (i < timings.length - 1) {
+            const nextDeliveryTime = timings[i + 1];
+            return {
+              day: "Today",
+              time_slot: nextDeliveryTime.time_slot,
+              type: nextDeliveryTime.type,
+              price: `${nextDeliveryTime.price}`,
+            };
+          } else {
+            const nextDay = today === 6 ? 0 : today + 1;
+            for (let j = 0; j < timings.length; j++) {
+              if (parseInt(timings[j].day) === nextDay) {
+                return {
+                  day: "Tomorrow",
+                  time_slot: timings[j].time_slot,
+                  type: timings[j].type,
+                  price: `${timings[j].price}`,
+                };
+              }
             }
           }
         }
+      } else if (parseInt(deliveryTime.day) > today) {
+        return {
+          day: getDayName(parseInt(deliveryTime.day)),
+          time_slot: deliveryTime.time_slot,
+          type: deliveryTime.type,
+          price: `${deliveryTime.price}`,
+        };
       }
-    } else if (parseInt(deliveryTime.day) > today) {
-      return {
-        day: getDayName(parseInt(deliveryTime.day)),
-        timeSlot: deliveryTime.time_slot,
-      };
     }
+    return null;
+  };
+
+  let nextDefaultSlot = findNextSlot(deliveryTimings, "Standard");
+  let nextPrioritySlot = priorityTimings
+    ? findNextSlot(priorityTimings, "Priority")
+    : null;
+
+  if (nextPrioritySlot) {
+    return { standard: nextDefaultSlot, priority: nextPrioritySlot };
   }
-  return null;
+  return nextDefaultSlot
+    ? { standard: nextDefaultSlot }
+    : { message: "not available" };
 };
 
 function formatHours(openingInfo) {
@@ -537,7 +562,7 @@ const deliveryTimings = (deliveryTimings) => {
   return modifiedTimings;
 };
 
-const generateDiscountLabel=(product)=>{
+const generateDiscountLabel = (product) => {
   let discountLabel = null;
   if (product.discount === null) {
     discountLabel = `Buy ${product.buy_quantity}, get ${product.get_quantity}`;
@@ -549,7 +574,7 @@ const generateDiscountLabel=(product)=>{
     }
   }
   return discountLabel;
-}
+};
 
 module.exports = {
   getMainCategories,
@@ -574,5 +599,5 @@ module.exports = {
   findSubCategoryOfStore,
   findProductsOfSubcategory,
   findProductsByStoreId,
-  generateDiscountLabel
+  generateDiscountLabel,
 };
