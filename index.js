@@ -11,6 +11,7 @@ const authRoutes=require('./routes/auth')
 const userRoutes=require('./routes/user');
 const storeRoutes=require('./routes/store')
 const productRoutes=require('./routes/products');
+const ordersRoutes=require('./routes/orders');
 
 
 app.use(bodyparser.json());
@@ -34,5 +35,6 @@ app.use(authRoutes);
 app.use('/userprofile',userRoutes);
 app.use('/store',storeRoutes);
 app.use('/products',productRoutes)
+app.use(ordersRoutes)
 
 app.listen(process.env.PORT);
