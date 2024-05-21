@@ -156,7 +156,7 @@ const findStoreInsideDetails = async (store_id) => {
   (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot, 'type', 'priority', 'price', df.charge + df.additional_charge))
   FROM timing to1 LEFT JOIN delivery_fee df ON to1.store_id = df.store_id
   WHERE s.id = to1.store_id AND to1.is_delivery_time=1 AND df.has_priority_avail = 1) AS priority_delivery_timings,
-  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot,'price',df.charge))FROM timing to1 WHERE s.id = to1.store_id AND to1.is_pickup_time=1)AS pickup_timings
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot,'price',df.pickup_fee))FROM timing to1 WHERE s.id = to1.store_id AND to1.is_pickup_time=1)AS pickup_timings
 FROM 
   store s
 LEFT JOIN 
@@ -189,7 +189,8 @@ GROUP BY
   df.has_priority_avail,
   sf.max_percentage,
   sf.min_value,
-  sf.per_item_charge;
+  sf.per_item_charge,
+  df.pickup_fee;
 `;
   return await db.query(query, [store_id]);
 };
@@ -539,7 +540,7 @@ const deliveryTimings = (deliveryTimings) => {
 
     const modifiedDaySlots = daySlots.map((slot) => {
       return {
-        price: slot.price,
+        price: `${slot.price}`,
         time_slot: slot.time_slot,
       };
     });

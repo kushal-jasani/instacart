@@ -1,4 +1,9 @@
+require("dotenv").config();
+
 const { generateResponse, sendHttpResponse } = require("../helper/response");
+const uuid = require("uuid");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 const {
   insertOrder,
   insertOrderItems,
@@ -10,12 +15,28 @@ const {
   insertIntoDeliveryAddress,
   findAddressFromId,
   findGiftCardImages,
+  getPaymentDetails,
+  updateOrderStatus,
+  updatePaymentDetails,
+  findPickupAddressDetails,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
   deliveryTimings,
   findStoreInsideDetails,
 } = require("../repository/store");
+
+const {
+  orderSchema,
+  calculateSubTotalSchema,
+  deliveryOrderSchema,
+  pickupOrderSchema,
+  addressSchema,
+} = require("../helper/order_schema");
+
+function generateInvoiceNumber() {
+  return uuid.v4();
+}
 
 exports.processOrder = async (req, res, next) => {
   try {
@@ -45,45 +66,104 @@ exports.processOrder = async (req, res, next) => {
       bag_fee,
       discount_applied,
       subtotal,
+      pickup_address_id,
+      pickup_day,
+      pickup_slot,
+      pickup_fee,
     } = req.body;
 
-    const [addressDetails] = await findAddressFromId(address_id);
-    const [deliveryAddress] = await insertIntoDeliveryAddress(
-      addressDetails[0]
-    );
-    const delivery_address_id = deliveryAddress.insertId;
+    let schema;
+
+    if (address_id) {
+      schema = deliveryOrderSchema;
+    } else if (pickup_address_id) {
+      schema = pickupOrderSchema;
+    } else {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "Either address_id or pickup_address_id must be provided, but not both.",
+        })
+      );
+    }
+
+    const { error } = schema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
+    let delivery_address_id;
+    if (address_id) {
+      const [addressDetails] = await findAddressFromId(address_id);
+      const [deliveryAddress] = await insertIntoDeliveryAddress(
+        addressDetails[0]
+      );
+      delivery_address_id = deliveryAddress.insertId;
+    }
 
     const orderData = {
       user_id: req.user.userId,
       store_id,
-      delivery_address_id,
-      delivery_instructions,
-      is_leave_it_door,
+      delivery_address_id: delivery_address_id || null,
+      delivery_instructions: delivery_address_id ? delivery_instructions : null,
+      is_leave_it_door: delivery_address_id ? is_leave_it_door : null,
       actual_subtotal,
       final_subtotal,
       service_fee,
       bag_fee,
-      delivery_fee,
+      delivery_fee: address_id ? delivery_fee : null,
       subtotal,
       discount_applied,
-      delivery_type,
-      delivery_day,
-      delivery_slot,
+      delivery_type: address_id ? delivery_type : null,
+      delivery_day: address_id ? delivery_day : null,
+      delivery_slot: address_id ? delivery_slot : null,
       country_code,
       mobile_number,
       payment_mode,
-      gift_recipitent_name: gift_option ? gift_recipitent_name : null,
-      recipitent_country_code: gift_option ? recipitent_country_code : null,
-      recipitent_mobile: gift_option ? recipitent_mobile : null,
-      gift_sender_name: gift_option ? gift_sender_name : null,
-      gift_card_image_id: gift_option ? gift_card_image_id : null,
-      gift_message: gift_option ? gift_message : null,
+      gift_recipitent_name:
+        gift_option && !pickup_address_id ? gift_recipitent_name : null,
+      recipitent_country_code:
+        gift_option && !pickup_address_id ? recipitent_country_code : null,
+      recipitent_mobile:
+        gift_option && !pickup_address_id ? recipitent_mobile : null,
+      gift_sender_name:
+        gift_option && !pickup_address_id ? gift_sender_name : null,
+      gift_card_image_id:
+        gift_option && !pickup_address_id ? gift_card_image_id : null,
+      gift_message: gift_option && !pickup_address_id ? gift_message : null,
+
+      pickup_address_id: pickup_address_id || null,
+      pickup_day: pickup_address_id ? pickup_day : null,
+      pickup_slot: pickup_address_id ? pickup_slot : null,
+      pickup_fee: pickup_address_id ? pickup_fee : null,
     };
 
     const [orderResult] = await insertOrder(orderData);
     const orderId = orderResult.insertId;
     await insertOrderItems(orderId, cart_items);
     await insertPaymentDetails(orderId, payment_mode);
+
+    let paymentIntent;
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: subtotal * 100,
+      currency: "usd",
+      description: "Order payment",
+      payment_method_types: ["card"],
+      metadata: { orderId },
+    });
 
     return sendHttpResponse(
       req,
@@ -92,7 +172,13 @@ exports.processOrder = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 201,
-        data: { orderId },
+        data: {
+          order_id: orderId,
+          paymentIntent_id: paymentIntent ? paymentIntent.id : null,
+          paymentIntent_client_secret: paymentIntent
+            ? paymentIntent.client_secret
+            : null,
+        },
         msg: "Order successfully created",
       })
     );
@@ -106,6 +192,136 @@ exports.processOrder = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "internal server error while creating order👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.webhook = async (req, res, next) => {
+  try {
+    const sig = req.headers["stripe-signature"];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    let event, orderId, invoiceNumber, paymentDetail;
+
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        const paymentIntentSucceeded = event.data.object;
+        orderId = paymentIntentSucceeded.metadata.orderId;
+
+        [paymentDetail] = await getPaymentDetails(orderId);
+        invoiceNumber = paymentDetail[0].invoice;
+        if (paymentDetail[0].status !== paymentIntentSucceeded.status) {
+          invoiceNumber = generateInvoiceNumber();
+        }
+
+        // Update order table status & the payment details table with the payment status
+        await updateOrderStatus(orderId, "placed");
+        await updatePaymentDetails(
+          orderId,
+          invoiceNumber,
+          paymentIntentSucceeded.payment_method_types[0],
+          paymentIntentSucceeded.status
+        );
+        break;
+
+      case "payment_intent.canceled":
+        const paymentIntentCanceled = event.data.object;
+        // Then define and call a function to handle the event payment_intent.canceled
+        break;
+
+      case "payment_intent.created":
+        const paymentIntentCreated = event.data.object;
+        // Then define and call a function to handle the event payment_intent.created
+        break;
+
+      case "payment_intent.payment_failed":
+        const paymentIntentPaymentFailed = event.data.object;
+        orderId = paymentIntentPaymentFailed.metadata.orderId;
+        [paymentDetail] = await getPaymentDetails(orderId);
+        invoiceNumber = paymentDetail[0].invoice_number;
+        if (paymentDetail[0].status !== paymentIntentPaymentFailed.status) {
+          invoiceNumber = generateInvoiceNumber();
+        }
+
+        // Update order table status & the payment details table with the payment status
+        await updateOrderStatus(orderId, "cancel");
+        await updatePaymentDetails(
+          orderId,
+          invoiceNumber,
+          paymentIntentPaymentFailed.payment_method_types[0],
+          paymentIntentPaymentFailed.status
+        );
+        break;
+
+      case "payment_intent.processing":
+        const paymentIntentProcessing = event.data.object;
+        // Then define and call a function to handle the event payment_intent.processing
+        break;
+
+      case "payment_intent.requires_action":
+        const paymentIntentRequiresAction = event.data.object;
+        // Then define and call a function to handle the event payment_intent.requires_action
+        break;
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+  } catch {
+    console.error("Error processing webhook event:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Webhook error",
+      })
+    );
+  }
+};
+
+exports.getStoreAddressForPickup = async (req, res, next) => {
+  try {
+    const { storeId } = req.query;
+
+    const [addressDetails] = await findPickupAddressDetails(storeId);
+
+    if (addressDetails.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "success",
+          statusCode: 200,
+          msg: "no pickup address has found for this store!!",
+        })
+      );
+    }
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 200,
+        status: "success",
+        data: { addressDetails },
+        msg: "Store pickup address fetched successfully🥳",
+      })
+    );
+  } catch (error) {
+    console.log("error while fetching store pickup address:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while fetching store pickup address👨🏻‍🔧",
       })
     );
   }
@@ -162,6 +378,19 @@ exports.addAddress = async (req, res, next) => {
     let { street, zip_code, floor, business_name, latitude, longitude } =
       req.body;
 
+    const { error } = addressSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const [addressResult] = await insertAddress(
       userId,
       street,
@@ -211,6 +440,14 @@ exports.getDeliverySlots = async (req, res, next) => {
         ),
         delivery_timings: deliveryTimings(store.delivery_timings),
       },
+      ...(store.is_pickup_avail === 1
+        ? {
+            pickup_time: {
+              next_pickup: getNextDeliverySlot(store.pickup_timings),
+              pickup_timings: deliveryTimings(store.pickup_timings),
+            },
+          }
+        : {}),
     }));
     return sendHttpResponse(
       req,
@@ -240,7 +477,33 @@ exports.getDeliverySlots = async (req, res, next) => {
 
 exports.calculateSubTotal = async (req, res, next) => {
   try {
-    const { store_id, cart_items, delivery_fee } = req.body;
+    const { store_id, cart_items, delivery_fee, pickup_fee } = req.body;
+
+    const { error } = calculateSubTotalSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+    if ((delivery_fee && pickup_fee) || (!delivery_fee && !pickup_fee)) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "Either delivery_fee or pickup_fee must be provided, but not both.",
+        })
+      );
+    }
     const productIds = cart_items.map((p) => p.product_id);
 
     const [productResults] = await cartItemsDetailWithDiscount(
@@ -305,7 +568,9 @@ exports.calculateSubTotal = async (req, res, next) => {
     if (storePricing.has_bag_fee) {
       bag_fee = Math.max(storePricing.bag_fee, 0);
     }
-    const subTotal = item_subtotal + delivery_fee + service_fee + bag_fee;
+    const applied_fee = delivery_fee ? delivery_fee : pickup_fee;
+
+    const subTotal = item_subtotal + applied_fee + service_fee + bag_fee;
     return sendHttpResponse(
       req,
       res,
@@ -316,7 +581,10 @@ exports.calculateSubTotal = async (req, res, next) => {
         data: {
           actual_item_subtotal: original_item_subtotal.toFixed(2),
           final_item_subtotal: item_subtotal.toFixed(2),
-          delivery_fee: delivery_fee.toFixed(2),
+          ...(applied_fee && {
+            [pickup_fee ? "pickup_fee" : "delivery_fee"]:
+              applied_fee.toFixed(2),
+          }),
           service_fee: service_fee.toFixed(2),
           bag_fee: bag_fee.toFixed(2),
           subtotal: subTotal.toFixed(2),
@@ -343,7 +611,7 @@ exports.calculateSubTotal = async (req, res, next) => {
 exports.getGiftcardImages = async (req, res, next) => {
   try {
     const [giftImages] = await findGiftCardImages();
-    if(!giftImages||giftImages.length==0){
+    if (!giftImages || giftImages.length == 0) {
       return sendHttpResponse(
         req,
         res,

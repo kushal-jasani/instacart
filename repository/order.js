@@ -1,33 +1,34 @@
 const db = require("../util/database");
 
 const insertOrder = async (orderData) => {
-  const sql = `
-    INSERT INTO orders SET
-      user_id = ${orderData.user_id},
-      store_id = ${orderData.store_id},
-      delivery_address_id = ${orderData.delivery_address_id},
-      delivery_instructions = '${orderData.delivery_instructions}',
-      is_leave_it_door = ${orderData.is_leave_it_door},
-      actual_subtotal = ${orderData.actual_subtotal},
-      final_subtotal = ${orderData.final_subtotal},
-      service_fee = ${orderData.service_fee},
-      bag_fee = ${orderData.bag_fee},
-      delivery_fee = ${orderData.delivery_fee},
-      discount_applied=${orderData.discount_applied},
-      subtotal = ${orderData.subtotal},
-      delivery_type = '${orderData.delivery_type}',
-      delivery_day = '${orderData.delivery_day}',
-      delivery_slot = '${orderData.delivery_slot}',
-      country_code = '${orderData.country_code}',
-      mobile = '${orderData.mobile_number}',
-      payment_mode = '${orderData.payment_mode}',
-      gift_recipitent_name = '${orderData.gift_recipitent_name}',
-      recipitent_country_code = '${orderData.recipitent_country_code}',
-      recipitent_mobile = '${orderData.recipitent_mobile}',
-      gift_sender_name = '${orderData.gift_sender_name}',
-      gift_card_image_id = ${orderData.gift_card_image_id},
-      gift_message = '${orderData.gift_message}'
-  `;
+  // const sql = `
+  //   INSERT INTO orders SET
+  //     user_id = ${orderData.user_id},
+  //     store_id = ${orderData.store_id},
+  //     delivery_address_id = ${orderData.delivery_address_id},
+  //     delivery_instructions = '${orderData.delivery_instructions}',
+  //     is_leave_it_door = ${orderData.is_leave_it_door},
+  //     actual_subtotal = ${orderData.actual_subtotal},
+  //     final_subtotal = ${orderData.final_subtotal},
+  //     service_fee = ${orderData.service_fee},
+  //     bag_fee = ${orderData.bag_fee},
+  //     delivery_fee = ${orderData.delivery_fee},
+  //     discount_applied=${orderData.discount_applied},
+  //     subtotal = ${orderData.subtotal},
+  //     delivery_type = '${orderData.delivery_type}',
+  //     delivery_day = '${orderData.delivery_day}',
+  //     delivery_slot = '${orderData.delivery_slot}',
+  //     country_code = '${orderData.country_code}',
+  //     mobile = '${orderData.mobile_number}',
+  //     payment_mode = '${orderData.payment_mode}',
+  //     gift_recipitent_name = '${orderData.gift_recipitent_name}',
+  //     recipitent_country_code = '${orderData.recipitent_country_code}',
+  //     recipitent_mobile = '${orderData.recipitent_mobile}',
+  //     gift_sender_name = '${orderData.gift_sender_name}',
+  //     gift_card_image_id = ${orderData.gift_card_image_id},
+  //     gift_message = '${orderData.gift_message}'
+  // `;
+  const sql =`INSERT INTO orders SET ?`
   return await db.query(sql, orderData);
 };
 
@@ -155,10 +156,27 @@ const findStorePricing = async (store_id) => {
   );
 };
 
+const findPickupAddressDetails=async(store_id)=>{
+  return await db.query(`SELECT id,address,city,state,country,zip_code,latitude,longitude FROM store_address WHERE store_id=?`,[store_id])
+}
+
 const findGiftCardImages=async()=>{
   return await db.query(`SELECT id,image FROM images
   WHERE is_gift=1;`)
 }
+
+const getPaymentDetails=async(order_id)=>{
+  return await db.query(`SELECT * FROM payment_details WHERE order_id=?;`,[order_id])
+}
+
+const updateOrderStatus=async(order_id,status)=>{
+  return await db.query(`UPDATE orders SET status = ? WHERE id = ?;`,[status,order_id])
+}
+
+const updatePaymentDetails=async(order_id,invoicenumber,type,status)=>{
+  return await db.query(`UPDATE paymentDetails SET invoice_number = ?, type = ?, status = ? WHERE order_id = ?;`,[invoicenumber,type,status,order_id])
+}
+
 
 module.exports = {
   insertOrder,
@@ -169,6 +187,10 @@ module.exports = {
   findAddressFromId,
   insertIntoDeliveryAddress,
   cartItemsDetailWithDiscount,
+  findPickupAddressDetails,
   findStorePricing,
-  findGiftCardImages
+  findGiftCardImages,
+  getPaymentDetails,
+  updateOrderStatus,
+  updatePaymentDetails
 };

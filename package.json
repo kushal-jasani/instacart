@@ -26,6 +26,8 @@
     "otpless-node-js-auth-sdk": "^1.0.8",
     "passport": "^0.7.0",
     "passport-google-oauth2": "^0.2.0",
-    "passport-jwt": "^4.0.1"
+    "passport-jwt": "^4.0.1",
+    "stripe": "^15.7.0",
+    "uuid": "^9.0.1"
   }
 }

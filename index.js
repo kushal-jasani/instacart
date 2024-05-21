@@ -14,8 +14,14 @@ const productRoutes=require('./routes/products');
 const ordersRoutes=require('./routes/orders');
 
 
-app.use(bodyparser.json());
-
+app.use(bodyparser.json({
+  verify: function (req, res, buf) {
+      var url = req.originalUrl;
+      if (url.startsWith('/orders/stripe/webhook')) {
+          req.rawBody = buf.toString()
+      }
+  }
+}));
 app.use(session({
   secret: process.env.SESSION_SECRET, 
   resave: false,
