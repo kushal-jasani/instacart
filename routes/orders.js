@@ -6,6 +6,8 @@ const {isAuth}=require('../middleware/is-auth');
 router.post('/orders/checkout',isAuth,ordersController.processOrder);
 
 router.post('/add-address',isAuth,ordersController.addAddress);
+router.post('/addresses/:addressId/edit-address',isAuth,ordersController.editAddress)
+router.delete('/addresses/:addressId/delete-address',isAuth,ordersController.deleteAddress);
 router.get('/addresses',isAuth,ordersController.getAddress);
 router.get('/addresses/pickup-address',isAuth,ordersController.getStoreAddressForPickup);
 router.get('/orders/delivery-timing',isAuth,ordersController.getDeliverySlots);

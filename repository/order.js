@@ -28,7 +28,7 @@ const insertOrder = async (orderData) => {
   //     gift_card_image_id = ${orderData.gift_card_image_id},
   //     gift_message = '${orderData.gift_message}'
   // `;
-  const sql =`INSERT INTO orders SET ?`
+  const sql = `INSERT INTO orders SET ?`;
   return await db.query(sql, orderData);
 };
 
@@ -37,9 +37,10 @@ const insertOrderItems = async (orderId, cart_items) => {
 
   const productIds = cart_items.map((p) => p.product_id);
   const [priceRows] = await db.query(
-  `SELECT product_id, selling_price AS price
+    `SELECT product_id, selling_price AS price
   FROM product_quantity
-  WHERE product_id IN (?)`,[productIds]
+  WHERE product_id IN (?)`,
+    [productIds]
   );
 
   const productPrices = priceRows.reduce((acc, curr) => {
@@ -48,8 +49,8 @@ const insertOrderItems = async (orderId, cart_items) => {
   }, {});
 
   const values = cart_items
-    .map((item) =>{
-      const price=productPrices[item.product_id];
+    .map((item) => {
+      const price = productPrices[item.product_id];
       return `(${orderId}, ${item.product_id}, ${item.quantity}, ${price})`;
     })
     .join(", ");
@@ -98,13 +99,26 @@ const findAddressDetails = async (userId) => {
   );
 };
 
-const findAddressFromId = async (id) => {
+const findAddressFromId = async (id, user_id) => {
   return await db.query(
-    "SELECT street,floor,business_name,zip_code,latitude,longitude from address where id=?;",
-    [id]
+    "SELECT street,floor,business_name,zip_code,latitude,longitude FROM address WHERE id=? AND user_id=?;",
+    [id, user_id]
   );
 };
+const deleteAddressFromId = async (id, user_id) => {
+  return await db.query(`DELETE FROM address WHERE id=? AND user_id=?`, [
+    id,
+    user_id,
+  ]);
+};
 
+const updateAddress = async (id, user_id, updatedfields) => {
+  return await db.query("UPDATE address SET ? WHERE id=? AND user_id=?", [
+    updatedfields,
+    id,
+    user_id,
+  ]);
+};
 const insertIntoDeliveryAddress = async (addressDetails) => {
   const { street, floor, business_name, zip_code, latitude, longitude } =
     addressDetails;
@@ -156,27 +170,37 @@ const findStorePricing = async (store_id) => {
   );
 };
 
-const findPickupAddressDetails=async(store_id)=>{
-  return await db.query(`SELECT id,address,city,state,country,zip_code,latitude,longitude FROM store_address WHERE store_id=?`,[store_id])
-}
+const findPickupAddressDetails = async (store_id) => {
+  return await db.query(
+    `SELECT id,address,city,state,country,zip_code,latitude,longitude FROM store_address WHERE store_id=?`,
+    [store_id]
+  );
+};
 
-const findGiftCardImages=async()=>{
+const findGiftCardImages = async () => {
   return await db.query(`SELECT id,image FROM images
-  WHERE is_gift=1;`)
-}
+  WHERE is_gift=1;`);
+};
 
-const getPaymentDetails=async(order_id)=>{
-  return await db.query(`SELECT * FROM payment_details WHERE order_id=?;`,[order_id])
-}
+const getPaymentDetails = async (order_id) => {
+  return await db.query(`SELECT * FROM payment_details WHERE order_id=?;`, [
+    order_id,
+  ]);
+};
 
-const updateOrderStatus=async(order_id,status)=>{
-  return await db.query(`UPDATE orders SET status = ? WHERE id = ?;`,[status,order_id])
-}
+const updateOrderStatus = async (order_id, status) => {
+  return await db.query(`UPDATE orders SET status = ? WHERE id = ?;`, [
+    status,
+    order_id,
+  ]);
+};
 
-const updatePaymentDetails=async(order_id,invoicenumber,type,status)=>{
-  return await db.query(`UPDATE paymentDetails SET invoice_number = ?, type = ?, status = ? WHERE order_id = ?;`,[invoicenumber,type,status,order_id])
-}
-
+const updatePaymentDetails = async (order_id, invoicenumber, type, status) => {
+  return await db.query(
+    `UPDATE paymentDetails SET invoice_number = ?, type = ?, status = ? WHERE order_id = ?;`,
+    [invoicenumber, type, status, order_id]
+  );
+};
 
 module.exports = {
   insertOrder,
@@ -185,6 +209,8 @@ module.exports = {
   insertAddress,
   findAddressDetails,
   findAddressFromId,
+  updateAddress,
+  deleteAddressFromId,
   insertIntoDeliveryAddress,
   cartItemsDetailWithDiscount,
   findPickupAddressDetails,
@@ -192,5 +218,5 @@ module.exports = {
   findGiftCardImages,
   getPaymentDetails,
   updateOrderStatus,
-  updatePaymentDetails
+  updatePaymentDetails,
 };

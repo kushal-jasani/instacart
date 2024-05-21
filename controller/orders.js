@@ -19,6 +19,8 @@ const {
   updateOrderStatus,
   updatePaymentDetails,
   findPickupAddressDetails,
+  updateAddress,
+  deleteAddressFromId,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -27,11 +29,11 @@ const {
 } = require("../repository/store");
 
 const {
-  orderSchema,
   calculateSubTotalSchema,
   deliveryOrderSchema,
   pickupOrderSchema,
   addressSchema,
+  editAddressSchema,
 } = require("../helper/order_schema");
 
 function generateInvoiceNumber() {
@@ -72,6 +74,7 @@ exports.processOrder = async (req, res, next) => {
       pickup_fee,
     } = req.body;
 
+    const userId = req.user.userId;
     let schema;
 
     if (address_id) {
@@ -107,7 +110,7 @@ exports.processOrder = async (req, res, next) => {
 
     let delivery_address_id;
     if (address_id) {
-      const [addressDetails] = await findAddressFromId(address_id);
+      const [addressDetails] = await findAddressFromId(address_id, userId);
       const [deliveryAddress] = await insertIntoDeliveryAddress(
         addressDetails[0]
       );
@@ -425,6 +428,108 @@ exports.addAddress = async (req, res, next) => {
     );
   }
 };
+
+exports.editAddress = async (req, res, next) => {
+  try {
+    const { addressId } = req.params;
+    const userId = req.user.userId;
+    const { street, zip_code, floor, business_name, latitude, longitude } =
+      req.body;
+
+      const { error } = editAddressSchema.validate(req.body);
+      if (error) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: error.details[0].message,
+          })
+        );
+      }
+
+    const [addressDetails] = await findAddressFromId(addressId, userId);
+    if (!addressDetails || addressDetails.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "No address with such addressId could be found",
+        })
+      );
+    }
+    const updatedFields = {
+      street: street || addressDetails[0].street,
+      zip_code: zip_code || addressDetails[0].zip_code,
+      floor: floor || addressDetails[0].floor,
+      business_name: business_name || addressDetails[0].business_name,
+      latitude: latitude || addressDetails[0].latitude,
+      longitude: longitude || addressDetails[0].longitude,
+    };
+
+    await updateAddress(addressId, userId, updatedFields);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: "Address updated successfully⚡️",
+      })
+    );
+  } catch (error) {
+    console.log("error while editing address:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while editing address👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.deleteAddress = async (req, res, next) => {
+  try {
+    const { addressId } = req.params;
+    const userId = req.user.userId;
+
+    await deleteAddressFromId(addressId, userId);
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: "Address deleted successfully",
+      })
+    );
+  } catch (error) {
+    console.log("error while deleting address:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while deleting address👨🏻‍🔧",
+      })
+    );
+  }
+};
+
 
 exports.getDeliverySlots = async (req, res, next) => {
   try {
