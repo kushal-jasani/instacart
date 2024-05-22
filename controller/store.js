@@ -23,6 +23,9 @@ const {
   findStoresByIds,
   findProductsByTitleAndStoreId,
   generateDiscountLabel,
+  createList,
+  insertListItems,
+  findListDetails,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -370,7 +373,10 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         decrtiption: store.policy_description,
       },
       delivery_time: {
-        next_delivery: getNextDeliverySlot(store.delivery_timings,store.priority_delivery_timings),
+        next_delivery: getNextDeliverySlot(
+          store.delivery_timings,
+          store.priority_delivery_timings
+        ),
         delivery_timings: deliveryTimings(store.delivery_timings),
       },
       ...(store.is_pickup_avail === 1
@@ -583,7 +589,10 @@ exports.search = async (req, res, next) => {
     const stores = await findStoresByName(query);
     const products = await findProductsByTitle(query);
 
-    if((!stores || stores.length==0) && (!products || products.length==0)){
+    if (
+      (!stores || stores.length == 0) &&
+      (!products || products.length == 0)
+    ) {
       return sendHttpResponse(
         req,
         res,
@@ -698,6 +707,219 @@ exports.searchInsideStore = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "Internal server error while searching inside store👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.addList = async (req, res, next) => {
+  try {
+    const user_id = req.user.userId;
+    const { store_id, title, description, cover_photo_id } = req.body;
+
+    const [listResult] = await createList(
+      user_id,
+      store_id,
+      title,
+      description,
+      cover_photo_id
+    );
+
+    if (!listResult || listResult.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "Failed to create list🚨",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 201,
+        data: { list_id: listResult.insertId },
+        msg: "List created successfully🚀",
+      })
+    );
+  } catch (error) {
+    console.log("Error while creating list: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while creating list👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.addListItems = async (req, res, next) => {
+  try {
+    const user_id = req.user.userId;
+    const { list_id, product_ids } = req.body;
+
+    try {
+      const [listResults] = await insertListItems(
+        user_id,
+        list_id,
+        product_ids
+      );
+
+      if (!listResults || listResults.length == 0) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: "Failed to add items to list❌",
+          })
+        );
+      }
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "success",
+          statusCode: 201,
+          msg: "Items added to your list successfully🔥",
+        })
+      );
+    } catch (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 403,
+          msg: error.message,
+        })
+      );
+    }
+  } catch (error) {
+    console.log("Error while adding listitems: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while adding listitems👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getList = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { storeId } = req.query;
+
+    const [listDetails] = await findListDetails(userId, storeId);
+
+    if (!listDetails || listDetails.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "No lists found",
+        })
+      );
+    }
+
+    const storeIds=[...new Set(listDetails.map(item=>item.store_id))];
+    const{todayRows,tomorrowRows}=await getNextDeliveryTime(storeIds);
+    const deliveryTimes={};
+
+    todayRows.forEach(row => {
+      if (!deliveryTimes[row.store_id]) {
+        deliveryTimes[row.store_id] = row.time_slot;
+      }
+    });
+
+    tomorrowRows.forEach(row => {
+      if (!deliveryTimes[row.store_id]) {
+        deliveryTimes[row.store_id] = row.time_slot;
+      }
+    });
+
+    const result = listDetails.reduce((acc, item) => {
+      const listIndex = acc.findIndex((list) => list.list_id === item.list_id);
+      if (listIndex === -1) {
+        acc.push({
+          list_id: item.list_id,
+          store_id: item.store_id,
+          store_name:item.store_name,
+          store_logo:item.store_logo,
+          next_delivery_time:deliveryTimes[item.store_id]||null,
+          user_id: item.user_id,
+          title: item.title,
+          decrtiption: item.description,
+          cover_image_url: item.list_cover_image,
+          products: [],
+        });
+      }
+
+      const product = {
+        id: item.product_id,
+        title: item.product_title,
+        image: item.product_image,
+        label:
+          item.quantity === 1
+            ? `${item.quantity_varient} ${item.unit}`
+            : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
+        actual_price: item.actual_price,
+        selling_price: item.selling_price,
+        ...(item.discount_id !== null && {
+          discount_label: generateDiscountLabel(item),
+        }),
+      };
+
+      acc[acc.findIndex((list) => list.list_id === item.list_id)].products.push(
+        product
+      );
+      return acc;
+    }, []);
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: result,
+        msg: "List details fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching lists: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching lists👨🏻‍🔧",
       })
     );
   }

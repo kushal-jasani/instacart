@@ -150,6 +150,7 @@ const findStoreInsideDetails = async (store_id) => {
   sf.max_percentage,
   sf.min_value,
   sf.per_item_charge,
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', so.day, 'time_slot', so.time_slot))FROM store_opening so WHERE s.id = so.store_id)AS store_opening_info,
   (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot, 'type', 'standard', 'price', df.charge))
   FROM timing to1 LEFT JOIN delivery_fee df ON to1.store_id = df.store_id
   WHERE s.id = to1.store_id AND to1.is_delivery_time=1) AS delivery_timings,
@@ -412,7 +413,7 @@ const convertTo24Hour = (time) => {
   );
 };
 
-const getNextDeliverySlot = (deliveryTimings,priorityTimings) => {
+const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length == 0) {
     return "not available";
   }
@@ -577,6 +578,81 @@ const generateDiscountLabel = (product) => {
   return discountLabel;
 };
 
+const createList = async (
+  user_id,
+  store_id,
+  title,
+  description,
+  cover_photo_id
+) => {
+  const sql = `INSERT INTO lists SET ?`;
+  return await db.query(sql, {
+    user_id,
+    store_id,
+    title,
+    description,
+    cover_photo_id,
+  });
+};
+
+const insertListItems=async(user_id, list_id,product_ids)=>{
+    if(product_ids.length==0) return;
+
+    const [owner]=await db.query('SELECT user_id FROM lists WHERE id=? AND user_id=?;',[list_id,user_id]);
+    if(owner.length==0){
+      throw new Error('List does not belong to the user');
+    }
+
+    const placeholders = product_ids.map(() => '(?, ?)').join(", ");
+    const values = product_ids.flatMap(product_id => [list_id, product_id]);
+    const sql=`INSERT INTO list_items (list_id,product_id) VALUES ${placeholders}`
+
+    return await db.query(sql,values)
+}
+
+const findListDetails=async(user_id,store_id)=>{
+  let sql=`
+  SELECT
+    l.id AS list_id,
+    l.store_id,
+    l.user_id,
+    l.title,
+    l.description,
+    (SELECT pi.image FROM images pi WHERE pi.product_id=l.cover_photo_id LIMIT 1)AS list_cover_image,
+    li.product_id,
+    p.id AS product_id,
+    p.title AS product_title,
+    (SELECT pi.image FROM images pi WHERE p.id=pi.product_id LIMIT 1)AS product_image,
+    pq.quantity,
+    pq.quantity_varient,
+    pq.unit,
+    pq.actual_price,
+    pq.selling_price,
+    p.discount_id,
+    d.buy_quantity,
+    d.get_quantity,
+    d.discount_type,
+    d.discount,
+    s.name AS store_name,
+    s.logo AS store_logo
+  FROM lists l
+  LEFT JOIN list_items li ON l.id=li.list_id
+  LEFT JOIN products p ON p.id=li.product_id
+  LEFT JOIN discounts d ON p.discount_id=d.id
+  LEFT JOIN product_quantity pq ON p.id=pq.product_id
+  LEFT JOIN store s ON l.store_id = s.id
+  WHERE l.user_id=?
+  `;
+
+  const params=[user_id]
+
+  if(store_id){
+    sql+=' AND l.store_id=?;'
+    params.push(store_id);
+  }
+
+  return await db.query(sql,params);
+}
 module.exports = {
   getMainCategories,
   getAllStores,
@@ -601,4 +677,7 @@ module.exports = {
   findProductsOfSubcategory,
   findProductsByStoreId,
   generateDiscountLabel,
+  createList,
+  insertListItems,
+  findListDetails
 };

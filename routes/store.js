@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const storeController=require('../controller/store');
+const {isAuth}=require('../middleware/is-auth')
 
 router.get('/categorylist',storeController.categoryFilter);
 router.get('/category',storeController.getStoresByCategory);
@@ -15,6 +16,11 @@ router.get('/collection/store/:storeId',storeController.getProductsByStoreId);
 
 router.get('/search',storeController.search)
 router.get('/inside/search',storeController.searchInsideStore)
+
+router.post('/lists/createlist',isAuth,storeController.addList);
+router.post('/lists/add-list-items',isAuth,storeController.addListItems);
+
+router.get('/lists/list-details',isAuth,storeController.getList);
 
 
 module.exports=router;
