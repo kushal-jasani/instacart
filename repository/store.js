@@ -41,6 +41,7 @@ const getNextDeliveryTime = async (storeIds) => {
     minute: "2-digit",
     hour12: true,
   });
+  console.log('time',currentTime)
   const todayQuery = `SELECT store_id, time_slot
                       FROM timing
                       WHERE store_id IN (?) AND day = ? AND is_delivery_time = 1 AND time_slot > ?
@@ -52,15 +53,17 @@ const getNextDeliveryTime = async (storeIds) => {
                           WHERE store_id IN (?) AND day = ?
                           AND is_delivery_time = 1
                           ORDER BY store_id, time_slot;`;
-
   const [todayRows] = await db.query(todayQuery, [
     storeIds,
     currentDay,
     currentTime,
   ]);
+  console.log("todayroews",todayRows)
 
   const nextDay = (currentDay + 1) % 7;
   const [tomorrowRows] = await db.query(tomorrowQuery, [storeIds, nextDay]);
+  console.log("tommror",tomorrowRows)
+
   return { todayRows, tomorrowRows };
 };
 
