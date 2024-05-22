@@ -130,8 +130,8 @@ const editAddressSchema = Joi.object({
   zip_code: Joi.string().min(5).optional(),
   floor: Joi.string().optional(),
   business_name: Joi.string().optional(),
-  latitude: Joi.string().optional(),
-  longitude: Joi.string().optional(),
+  latitude: Joi.number().precision(8).optional(),
+  longitude: Joi.number().precision(8).optional(),
 });
 module.exports = {
   deliveryOrderSchema,
