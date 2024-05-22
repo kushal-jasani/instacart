@@ -23,6 +23,7 @@ const {
   findStoresByIds,
   findProductsByTitleAndStoreId,
   generateDiscountLabel,
+  createList,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -370,7 +371,10 @@ exports.getStoreDetailsInside = async (req, res, next) => {
         decrtiption: store.policy_description,
       },
       delivery_time: {
-        next_delivery: getNextDeliverySlot(store.delivery_timings,store.priority_delivery_timings),
+        next_delivery: getNextDeliverySlot(
+          store.delivery_timings,
+          store.priority_delivery_timings
+        ),
         delivery_timings: deliveryTimings(store.delivery_timings),
       },
       ...(store.is_pickup_avail === 1
@@ -583,7 +587,10 @@ exports.search = async (req, res, next) => {
     const stores = await findStoresByName(query);
     const products = await findProductsByTitle(query);
 
-    if((!stores || stores.length==0) && (!products || products.length==0)){
+    if (
+      (!stores || stores.length == 0) &&
+      (!products || products.length == 0)
+    ) {
       return sendHttpResponse(
         req,
         res,
@@ -698,6 +705,58 @@ exports.searchInsideStore = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "Internal server error while searching inside store👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.addList = async (req, res, next) => {
+  try {
+    const user_id = req.user.userId;
+    const { store_id, title, description, cover_photo_id } = req.body;
+
+    const [listResult] = await createList(
+      user_id,
+      store_id,
+      title,
+      description,
+      cover_photo_id
+    );
+
+    if (!listResult || listResult.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "Failed to create list",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 201,
+        data: { list_id: listResult.insertId },
+        msg: "List created successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while creating list: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while creating list👨🏻‍🔧",
       })
     );
   }

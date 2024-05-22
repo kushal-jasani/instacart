@@ -412,7 +412,7 @@ const convertTo24Hour = (time) => {
   );
 };
 
-const getNextDeliverySlot = (deliveryTimings,priorityTimings) => {
+const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length == 0) {
     return "not available";
   }
@@ -577,6 +577,23 @@ const generateDiscountLabel = (product) => {
   return discountLabel;
 };
 
+const createList = async (
+  user_id,
+  store_id,
+  title,
+  description,
+  cover_photo_id
+) => {
+  const sql = `INSERT INTO lists SET ?`;
+  return await db.query(sql, {
+    user_id,
+    store_id,
+    title,
+    description,
+    cover_photo_id,
+  });
+};
+
 module.exports = {
   getMainCategories,
   getAllStores,
@@ -601,4 +618,5 @@ module.exports = {
   findProductsOfSubcategory,
   findProductsByStoreId,
   generateDiscountLabel,
+  createList,
 };
