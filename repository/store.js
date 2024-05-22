@@ -150,6 +150,7 @@ const findStoreInsideDetails = async (store_id) => {
   sf.max_percentage,
   sf.min_value,
   sf.per_item_charge,
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', so.day, 'time_slot', so.time_slot))FROM store_opening so WHERE s.id = so.store_id)AS store_opening_info,
   (SELECT JSON_ARRAYAGG(JSON_OBJECT('day', to1.day, 'time_slot', to1.time_slot, 'type', 'standard', 'price', df.charge))
   FROM timing to1 LEFT JOIN delivery_fee df ON to1.store_id = df.store_id
   WHERE s.id = to1.store_id AND to1.is_delivery_time=1) AS delivery_timings,
