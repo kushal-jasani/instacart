@@ -422,6 +422,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   }
   var today = new Date().getDay();
   var currentTime = new Date();
+  console.log('currtime',currentTime)
   var currentHours = currentTime.getHours();
 
   var currentMinutes = currentTime.getMinutes();
@@ -451,6 +452,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
         ) {
           if (i < timings.length - 1) {
             const nextDeliveryTime = timings[i + 1];
+            console.log('today',nextDeliveryTime.time_slot)
             return {
               day: "Today",
               time_slot: nextDeliveryTime.time_slot,
@@ -461,6 +463,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
             const nextDay = today === 6 ? 0 : today + 1;
             for (let j = 0; j < timings.length; j++) {
               if (parseInt(timings[j].day) === nextDay) {
+                console.log('tomorrow',timings[j].time_slot)
                 return {
                   day: "Tomorrow",
                   time_slot: timings[j].time_slot,
