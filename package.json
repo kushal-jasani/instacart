@@ -22,6 +22,9 @@
     "mysql2": "^3.9.7",
     "nodemailer": "^6.9.13",
     "nodemailer-sendgrid-transport": "^0.2.0",
-    "otpless-node-js-auth-sdk": "^1.0.8"
+    "otpless-node-js-auth-sdk": "^1.0.8",
+    "passport": "^0.7.0",
+    "passport-google-oauth2": "^0.2.0",
+    "passport-jwt": "^4.0.1"
   }
 }
