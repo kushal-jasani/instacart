@@ -676,7 +676,7 @@ const createList = async (
 };
 
 const updateListDetails = async (updatedFields, user_id, list_id) => {
-  const sql = `UPDATE lists SET ? WHERE user_id = ? AND id = ?;`;
+  const sql = `UPDATE lists SET ? WHERE user_id = ? AND id = ?;`
 
   return db.query(sql, [updatedFields, user_id, list_id]);
 };
@@ -703,7 +703,7 @@ const updateListItems = async (user_id, list_id, product_ids) => {
   if (product_ids.length == 0) return;
 
   const [owner] = await db.query(
-    "SELECT user_id FROM lists WHERE id=? AND user_id=?;",
+    `SELECT user_id FROM lists WHERE id=? AND user_id=?;`,
     [list_id, user_id]
   );
   if (owner.length == 0) {
@@ -764,7 +764,7 @@ const findListDetails = async (user_id, store_id) => {
 };
 
 const findCoverImagesOfList = async () => {
-  return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`);
+  return await db.query( `SELECT id,image FROM images WHERE is_cover=1;`);
 };
 module.exports = {
   getMainCategories,
