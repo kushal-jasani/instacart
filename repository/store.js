@@ -413,30 +413,113 @@ const convertTo24Hour = (time) => {
   );
 };
 
+// const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
+//   if (!deliveryTimings || deliveryTimings.length == 0) {
+//     return "not available";
+//   }
+//   var today = new Date().getDay();
+//   var currentTime = new Date();
+//   var currentHours = currentTime.getHours();
+
+//   var currentMinutes = currentTime.getMinutes();
+//   var currentTimeInMinutes = currentHours * 60 + currentMinutes;
+
+//   const findNextSlot = (timings, type) => {
+//     for (let i = 0; i < timings.length; i++) {
+//       const deliveryTime = timings[i];
+//       const timeSlotParts = deliveryTime.time_slot.split(" - ");
+//       const startTime = convertTo24Hour(timeSlotParts[0]);
+//       const endTime = convertTo24Hour(timeSlotParts[1]);
+//       const startTimeParts = startTime.split(":");
+//       const endTimeParts = endTime.split(":");
+
+//       const startHours = parseInt(startTimeParts[0]);
+//       const startMinutes = parseInt(startTimeParts[1]);
+//       const endHours = parseInt(endTimeParts[0]);
+//       const endMinutes = parseInt(endTimeParts[1]);
+
+//       const startTimeInMinutes = startHours * 60 + startMinutes;
+//       const endTimeInMinutes = endHours * 60 + endMinutes;
+
+//       if (parseInt(deliveryTime.day) === today) {
+//         if (
+//           currentTimeInMinutes >= startTimeInMinutes &&
+//           currentTimeInMinutes < endTimeInMinutes
+//         ) {
+//           if (i < timings.length - 1) {
+//             const nextDeliveryTime = timings[i + 1];
+//             return {
+//               day: "Today",
+//               time_slot: nextDeliveryTime.time_slot,
+//               type: nextDeliveryTime.type,
+//               price: `${nextDeliveryTime.price}`,
+//             };
+//           } else {
+//             const nextDay = today === 6 ? 0 : today + 1;
+//             for (let j = 0; j < timings.length; j++) {
+//               if (parseInt(timings[j].day) === nextDay) {
+//                 return {
+//                   day: "Tomorrow",
+//                   time_slot: timings[j].time_slot,
+//                   type: timings[j].type,
+//                   price: `${timings[j].price}`,
+//                 };
+//               }
+//             }
+//           }
+//         }
+//       } else if (parseInt(deliveryTime.day) > today) {
+//         return {
+//           day: getDayName(parseInt(deliveryTime.day)),
+//           time_slot: deliveryTime.time_slot,
+//           type: deliveryTime.type,
+//           price: `${deliveryTime.price}`,
+//         };
+//       }
+//     }
+//     return null;
+//   };
+
+//   let nextDefaultSlot = findNextSlot(deliveryTimings, "Standard");
+//   let nextPrioritySlot = priorityTimings
+//     ? findNextSlot(priorityTimings, "Priority")
+//     : null;
+
+//   if (nextPrioritySlot) {
+//     return { standard: nextDefaultSlot, priority: nextPrioritySlot };
+//   }
+//   return nextDefaultSlot
+//     ? { standard: nextDefaultSlot }
+//     : { message: "not available" };
+// };
+
+
 const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
-  if (!deliveryTimings || deliveryTimings.length == 0) {
+  if (!deliveryTimings || deliveryTimings.length === 0) {
     return "not available";
   }
-  var today = new Date().getDay();
-  var currentTime = new Date();
-  var currentHours = currentTime.getHours();
 
-  var currentMinutes = currentTime.getMinutes();
-  var currentTimeInMinutes = currentHours * 60 + currentMinutes;
+  const currentDate = new Date();
+  currentDate.setMinutes(currentDate.getMinutes() - 60);
+  const today = currentDate.getDay();
+  const currentTime = currentDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-  const findNextSlot = (timings, type) => {
+  const currentHours = currentDate.getHours();
+  const currentMinutes = currentDate.getMinutes();
+  const currentTimeInMinutes = currentHours * 60 + currentMinutes;
+
+  const findNextSlot = (timings) => {
     for (let i = 0; i < timings.length; i++) {
       const deliveryTime = timings[i];
       const timeSlotParts = deliveryTime.time_slot.split(" - ");
       const startTime = convertTo24Hour(timeSlotParts[0]);
       const endTime = convertTo24Hour(timeSlotParts[1]);
-      const startTimeParts = startTime.split(":");
-      const endTimeParts = endTime.split(":");
-
-      const startHours = parseInt(startTimeParts[0]);
-      const startMinutes = parseInt(startTimeParts[1]);
-      const endHours = parseInt(endTimeParts[0]);
-      const endMinutes = parseInt(endTimeParts[1]);
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
 
       const startTimeInMinutes = startHours * 60 + startMinutes;
       const endTimeInMinutes = endHours * 60 + endMinutes;
@@ -480,17 +563,13 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
     return null;
   };
 
-  let nextDefaultSlot = findNextSlot(deliveryTimings, "Standard");
-  let nextPrioritySlot = priorityTimings
-    ? findNextSlot(priorityTimings, "Priority")
-    : null;
+  let nextDefaultSlot = findNextSlot(deliveryTimings);
+  let nextPrioritySlot = priorityTimings ? findNextSlot(priorityTimings) : null;
 
   if (nextPrioritySlot) {
     return { standard: nextDefaultSlot, priority: nextPrioritySlot };
   }
-  return nextDefaultSlot
-    ? { standard: nextDefaultSlot }
-    : { message: "not available" };
+  return nextDefaultSlot ? { standard: nextDefaultSlot } : { message: "not available" };
 };
 
 function formatHours(openingInfo) {
@@ -595,6 +674,13 @@ const createList = async (
   });
 };
 
+const updateListDetails=async(updatedFields,user_id,list_id)=>{
+
+  const sql=`UPDATE lists SET ? WHERE user_id = ? AND id = ?;`
+
+  return db.query(sql,[updatedFields,user_id,list_id])
+}
+
 const insertListItems=async(user_id, list_id,product_ids)=>{
     if(product_ids.length==0) return;
 
@@ -616,9 +702,11 @@ const findListDetails=async(user_id,store_id)=>{
     l.id AS list_id,
     l.store_id,
     l.user_id,
+    u.first_name,
+    u.last_name,
     l.title,
     l.description,
-    (SELECT pi.image FROM images pi WHERE pi.product_id=l.cover_photo_id LIMIT 1)AS list_cover_image,
+    (SELECT pi.image FROM images pi WHERE pi.id=l.cover_photo_id AND is_cover=1 LIMIT 1)AS list_cover_image,
     li.product_id,
     p.id AS product_id,
     p.title AS product_title,
@@ -641,6 +729,7 @@ const findListDetails=async(user_id,store_id)=>{
   LEFT JOIN discounts d ON p.discount_id=d.id
   LEFT JOIN product_quantity pq ON p.id=pq.product_id
   LEFT JOIN store s ON l.store_id = s.id
+  LEFT JOIN users u ON u.id=l.user_id
   WHERE l.user_id=?
   `;
 
@@ -652,6 +741,10 @@ const findListDetails=async(user_id,store_id)=>{
   }
 
   return await db.query(sql,params);
+}
+
+const findCoverImagesOfList=async()=>{
+  return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`)
 }
 module.exports = {
   getMainCategories,
@@ -678,6 +771,8 @@ module.exports = {
   findProductsByStoreId,
   generateDiscountLabel,
   createList,
+  updateListDetails,
   insertListItems,
-  findListDetails
+  findListDetails,
+  findCoverImagesOfList
 };

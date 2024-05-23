@@ -20,7 +20,11 @@ router.get('/inside/search',storeController.searchInsideStore)
 router.post('/lists/createlist',isAuth,storeController.addList);
 router.post('/lists/add-list-items',isAuth,storeController.addListItems);
 
+router.get('/lists/cover-images',storeController.getListCoverImages);
 router.get('/lists/list-details',isAuth,storeController.getList);
+
+router.post('/lists/:listId/edit',isAuth,storeController.editList);
+
 
 
 module.exports=router;

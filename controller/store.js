@@ -26,6 +26,8 @@ const {
   createList,
   insertListItems,
   findListDetails,
+  findCoverImagesOfList,
+  updateListDetails,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -712,6 +714,49 @@ exports.searchInsideStore = async (req, res, next) => {
   }
 };
 
+exports.getListCoverImages = async (req, res, next) => {
+  try {
+    const [coverImages] = await findCoverImagesOfList();
+
+    if (!coverImages || coverImages.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "No cover image found",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: { coverImages },
+        msg: "Cover images fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching cover images of list : ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching cover images of list👨🏻‍🔧",
+      })
+    );
+  }
+};
+
 exports.addList = async (req, res, next) => {
   try {
     const user_id = req.user.userId;
@@ -764,6 +809,82 @@ exports.addList = async (req, res, next) => {
   }
 };
 
+exports.editList = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { listId } = req.params;
+    const { title, description, cover_photo_id } = req.body;
+    const updatedFields = {};
+
+    if (title) {
+      updatedFields.title = title;
+    }
+
+    if (description) {
+      updatedFields.description = description;
+    }
+
+    if (cover_photo_id) {
+      updatedFields.cover_photo_id = cover_photo_id;
+    }
+
+    console.log(updatedFields);
+    if (Object.keys(updatedFields).length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "No fields to update",
+        })
+      );
+    }
+
+    const [updatedList] = await updateListDetails(
+      updatedFields,
+      userId,
+      listId
+    );
+
+    if (updatedList.affectedRows === 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "List not found or user not authorized☹️",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: "List updated successfully✅",
+      })
+    );
+  } catch (error) {
+    console.log("Error while editing list: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while editing list👨🏻‍🔧",
+      })
+    );
+  }
+};
 exports.addListItems = async (req, res, next) => {
   try {
     const user_id = req.user.userId;
@@ -825,6 +946,26 @@ exports.addListItems = async (req, res, next) => {
   }
 };
 
+exports.removeListItems=async(req,res,next)=>{
+  try{
+    const {product_ids}=req.body;
+
+  }
+  catch(error){
+    console.log("Error while removeing listitems: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while removing listitems👨🏻‍🔧",
+      })
+    );
+  }
+}
+
 exports.getList = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -845,17 +986,17 @@ exports.getList = async (req, res, next) => {
       );
     }
 
-    const storeIds=[...new Set(listDetails.map(item=>item.store_id))];
-    const{todayRows,tomorrowRows}=await getNextDeliveryTime(storeIds);
-    const deliveryTimes={};
+    const storeIds = [...new Set(listDetails.map((item) => item.store_id))];
+    const { todayRows, tomorrowRows } = await getNextDeliveryTime(storeIds);
+    const deliveryTimes = {};
 
-    todayRows.forEach(row => {
+    todayRows.forEach((row) => {
       if (!deliveryTimes[row.store_id]) {
         deliveryTimes[row.store_id] = row.time_slot;
       }
     });
 
-    tomorrowRows.forEach(row => {
+    tomorrowRows.forEach((row) => {
       if (!deliveryTimes[row.store_id]) {
         deliveryTimes[row.store_id] = row.time_slot;
       }
@@ -867,10 +1008,13 @@ exports.getList = async (req, res, next) => {
         acc.push({
           list_id: item.list_id,
           store_id: item.store_id,
-          store_name:item.store_name,
-          store_logo:item.store_logo,
-          next_delivery_time:deliveryTimes[item.store_id]||null,
+          store_name: item.store_name,
+          store_logo: item.store_logo,
+          next_delivery_time: deliveryTimes[item.store_id] || null,
           user_id: item.user_id,
+          user_name: item.last_name
+            ? `${item.first_name} ${item.last_name}`
+            : item.first_name,
           title: item.title,
           decrtiption: item.description,
           cover_image_url: item.list_cover_image,
@@ -878,24 +1022,26 @@ exports.getList = async (req, res, next) => {
         });
       }
 
-      const product = {
-        id: item.product_id,
-        title: item.product_title,
-        image: item.product_image,
-        label:
-          item.quantity === 1
-            ? `${item.quantity_varient} ${item.unit}`
-            : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
-        actual_price: item.actual_price,
-        selling_price: item.selling_price,
-        ...(item.discount_id !== null && {
-          discount_label: generateDiscountLabel(item),
-        }),
-      };
+      if (item.product_id) {
+        const product = {
+          id: item.product_id,
+          title: item.product_title,
+          image: item.product_image,
+          label:
+            item.quantity === 1
+              ? `${item.quantity_varient} ${item.unit}`
+              : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
+          actual_price: item.actual_price,
+          selling_price: item.selling_price,
+          ...(item.discount_id !== null && {
+            discount_label: generateDiscountLabel(item),
+          }),
+        };
 
-      acc[acc.findIndex((list) => list.list_id === item.list_id)].products.push(
-        product
-      );
+        acc[
+          acc.findIndex((list) => list.list_id === item.list_id)
+        ].products.push(product);
+      }
       return acc;
     }, []);
 
