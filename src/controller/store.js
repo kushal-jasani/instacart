@@ -3,6 +3,12 @@ const {
   sendHttpResponse,
 } = require("../helper/response");
 const {
+  editListItemsSchema,
+  editListSchema,
+  addListItemsSchema,
+  addListSchema,
+} = require("../validator/store_schema");
+const {
   getMainCategories,
   getAllStores,
   checkInStorePrices,
@@ -29,6 +35,9 @@ const {
   createList,
   insertListItems,
   findListDetails,
+  findCoverImagesOfList,
+  updateListDetails,
+  updateListItems,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -373,7 +382,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
       },
       return_policy: {
         return_policy_title: store.return_policy_title,
-        decrtiption: store.policy_description,
+        description: store.policy_description,
       },
       delivery_time: {
         next_delivery: getNextDeliverySlot(
@@ -715,10 +724,67 @@ exports.searchInsideStore = async (req, res, next) => {
   }
 };
 
+exports.getListCoverImages = async (req, res, next) => {
+  try {
+    const [coverImages] = await findCoverImagesOfList();
+
+    if (!coverImages || coverImages.length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "No cover image found",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: { coverImages },
+        msg: "Cover images fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching cover images of list : ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching cover images of list👨🏻‍🔧",
+      })
+    );
+  }
+};
+
 exports.addList = async (req, res, next) => {
   try {
     const user_id = req.user.userId;
     const { store_id, title, description, cover_photo_id } = req.body;
+
+    const { error } = addListSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
 
     const [listResult] = await createList(
       user_id,
@@ -767,10 +833,115 @@ exports.addList = async (req, res, next) => {
   }
 };
 
+exports.editList = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { listId } = req.params;
+    const { title, description, cover_photo_id } = req.body;
+
+    const { error } = editListSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
+    const updatedFields = {};
+
+    if (title) {
+      updatedFields.title = title;
+    }
+
+    if (description) {
+      updatedFields.description = description;
+    }
+
+    if (cover_photo_id) {
+      updatedFields.cover_photo_id = cover_photo_id;
+    }
+
+    console.log(updatedFields);
+    if (Object.keys(updatedFields).length == 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "No fields to update",
+        })
+      );
+    }
+
+    const [updatedList] = await updateListDetails(
+      updatedFields,
+      userId,
+      listId
+    );
+
+    if (updatedList.affectedRows === 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "List not found or user not authorized☹️",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: "List updated successfully✅",
+      })
+    );
+  } catch (error) {
+    console.log("Error while editing list: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while editing list👨🏻‍🔧",
+      })
+    );
+  }
+};
 exports.addListItems = async (req, res, next) => {
   try {
     const user_id = req.user.userId;
     const { list_id, product_ids } = req.body;
+
+    const { error } = addListItemsSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
 
     try {
       const [listResults] = await insertListItems(
@@ -828,6 +999,81 @@ exports.addListItems = async (req, res, next) => {
   }
 };
 
+exports.editListItems = async (req, res, next) => {
+  try {
+    const user_id = req.user.userId;
+    const { list_id, product_ids } = req.body;
+
+    const { error } = editListItemsSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
+    try {
+      const [updatedlistResults] = await updateListItems(
+        user_id,
+        list_id,
+        product_ids
+      );
+
+      if (!updatedlistResults || updatedlistResults.length == 0) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: "No products were removed",
+          })
+        );
+      }
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "success",
+          statusCode: 201,
+          msg: "Products removed successfully from list🔥",
+        })
+      );
+    } catch (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 403,
+          msg: error.message,
+        })
+      );
+    }
+  } catch (error) {
+    console.log("Error while removeing listitems: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while removing listitems👨🏻‍🔧",
+      })
+    );
+  }
+};
+
 exports.getList = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -874,31 +1120,36 @@ exports.getList = async (req, res, next) => {
           store_logo: item.store_logo,
           next_delivery_time: deliveryTimes[item.store_id] || null,
           user_id: item.user_id,
+          user_name: item.last_name
+            ? `${item.first_name} ${item.last_name}`
+            : item.first_name,
           title: item.title,
-          decrtiption: item.description,
+          description: item.description,
           cover_image_url: item.list_cover_image,
           products: [],
         });
       }
 
-      const product = {
-        id: item.product_id,
-        title: item.product_title,
-        image: item.product_image,
-        label:
-          item.quantity === 1
-            ? `${item.quantity_varient} ${item.unit}`
-            : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
-        actual_price: item.actual_price,
-        selling_price: item.selling_price,
-        ...(item.discount_id !== null && {
-          discount_label: generateDiscountLabel(item),
-        }),
-      };
+      if (item.product_id) {
+        const product = {
+          id: item.product_id,
+          title: item.product_title,
+          image: item.product_image,
+          label:
+            item.quantity === 1
+              ? `${item.quantity_varient} ${item.unit}`
+              : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
+          actual_price: item.actual_price,
+          selling_price: item.selling_price,
+          ...(item.discount_id !== null && {
+            discount_label: generateDiscountLabel(item),
+          }),
+        };
 
-      acc[acc.findIndex((list) => list.list_id === item.list_id)].products.push(
-        product
-      );
+        acc[
+          acc.findIndex((list) => list.list_id === item.list_id)
+        ].products.push(product);
+      }
       return acc;
     }, []);
 
