@@ -443,7 +443,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
       const endMinutes = parseInt(endTimeParts[1]);
 
       const startTimeInMinutes = startHours * 60 + startMinutes;
-      const endTimeInMinutes = endHours * 60 + endMinutes;
+      const endTimeInMinutes =  endHours * 60 + endMinutes;
 
       if (parseInt(deliveryTime.day) === today) {
         if (
