@@ -711,6 +711,9 @@ module.exports = {
   findProductsByStoreId,
   generateDiscountLabel,
   createList,
+  updateListDetails,
   insertListItems,
-  findListDetails
+  updateListItems,
+  findListDetails,
+  findCoverImagesOfList
 };
