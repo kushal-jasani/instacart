@@ -30,6 +30,56 @@ const {
   postResetPasswordSchema,
 } = require("../validator/validation_schema");
 
+exports.loginOrRegisterWithGoogle = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          statusCode: 401,
+          status: "error",
+          msg: "User not authenticated",
+        })
+      );
+    }
+    const id = req.user.insertId ? req.user.insertId : req.user[0].id;
+
+    const accessToken = generateAccessToken(id);
+    const refreshToken = generateRefreshToken(id);
+    const htmlWithEmbeddedJWT = `
+    <html>
+      <script>
+        // Save JWT to localStorage
+        window.localStorage.setItem('accessToken', '${accessToken}');
+        window.localStorage.setItem('refreshToken', '${refreshToken}');
+
+        // Redirect browser to root of application
+        window.location.href = ${
+          process.env.NODE_ENV === "production"
+            ? process.env.REDIRECT_LIVE
+            : process.env.REDIRECT_LOCAL
+        };
+      </script>
+    </html>
+    `;
+    res.send(htmlWithEmbeddedJWT);
+  } catch (error) {
+    console.log("Error in loginOrRegisterWithGoogle", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while loginOrRegisterWithGoogle👨🏻‍🔧",
+      })
+    );
+  }
+};
+
 exports.sendOtpRegister = async (req, res, next) => {
   try {
     const { email, phoneno, country_code } = req.body;
