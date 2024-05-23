@@ -1,5 +1,11 @@
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 const {
+  editListItemsSchema,
+  editListSchema,
+  addListItemsSchema,
+  addListSchema,
+} = require("../validator/store_schema");
+const {
   getMainCategories,
   getAllStores,
   checkInStorePrices,
@@ -28,6 +34,7 @@ const {
   findListDetails,
   findCoverImagesOfList,
   updateListDetails,
+  updateListItems,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -372,7 +379,7 @@ exports.getStoreDetailsInside = async (req, res, next) => {
       },
       return_policy: {
         return_policy_title: store.return_policy_title,
-        decrtiption: store.policy_description,
+        description: store.policy_description,
       },
       delivery_time: {
         next_delivery: getNextDeliverySlot(
@@ -762,6 +769,20 @@ exports.addList = async (req, res, next) => {
     const user_id = req.user.userId;
     const { store_id, title, description, cover_photo_id } = req.body;
 
+    const { error } = addListSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
     const [listResult] = await createList(
       user_id,
       store_id,
@@ -814,6 +835,21 @@ exports.editList = async (req, res, next) => {
     const userId = req.user.userId;
     const { listId } = req.params;
     const { title, description, cover_photo_id } = req.body;
+
+    const { error } = editListSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
     const updatedFields = {};
 
     if (title) {
@@ -890,6 +926,20 @@ exports.addListItems = async (req, res, next) => {
     const user_id = req.user.userId;
     const { list_id, product_ids } = req.body;
 
+    const { error } = addListItemsSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
     try {
       const [listResults] = await insertListItems(
         user_id,
@@ -946,12 +996,67 @@ exports.addListItems = async (req, res, next) => {
   }
 };
 
-exports.removeListItems=async(req,res,next)=>{
-  try{
-    const {product_ids}=req.body;
+exports.editListItems = async (req, res, next) => {
+  try {
+    const user_id = req.user.userId;
+    const { list_id, product_ids } = req.body;
 
-  }
-  catch(error){
+    const { error } = editListItemsSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
+
+    try {
+      const [updatedlistResults] = await updateListItems(
+        user_id,
+        list_id,
+        product_ids
+      );
+
+      if (!updatedlistResults || updatedlistResults.length == 0) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 400,
+            msg: "No products were removed",
+          })
+        );
+      }
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "success",
+          statusCode: 201,
+          msg: "Products removed successfully from list🔥",
+        })
+      );
+    } catch (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 403,
+          msg: error.message,
+        })
+      );
+    }
+  } catch (error) {
     console.log("Error while removeing listitems: ", error);
     return sendHttpResponse(
       req,
@@ -964,7 +1069,7 @@ exports.removeListItems=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
 exports.getList = async (req, res, next) => {
   try {
@@ -1016,7 +1121,7 @@ exports.getList = async (req, res, next) => {
             ? `${item.first_name} ${item.last_name}`
             : item.first_name,
           title: item.title,
-          decrtiption: item.description,
+          description: item.description,
           cover_image_url: item.list_cover_image,
           products: [],
         });

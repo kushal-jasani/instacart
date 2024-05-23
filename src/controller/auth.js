@@ -1,6 +1,5 @@
-require("dotenv").config();
 
-const { generateResponse, sendHttpResponse } = require("../helper/response");
+const { generateResponse, sendHttpResponse } = require('../helper/response');
 
 const otpless = require("otpless-node-js-auth-sdk");
 const bcrypt = require("bcryptjs");
@@ -30,7 +29,7 @@ const {
   verifyLoginSchema,
   refreshAccessTokenSchema,
   postResetPasswordSchema,
-} = require("../helper/validation_schema");
+} = require("../validator/validation_schema");
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {

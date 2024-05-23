@@ -493,7 +493,6 @@ const convertTo24Hour = (time) => {
 //     : { message: "not available" };
 // };
 
-
 const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length === 0) {
     return "not available";
@@ -569,7 +568,9 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (nextPrioritySlot) {
     return { standard: nextDefaultSlot, priority: nextPrioritySlot };
   }
-  return nextDefaultSlot ? { standard: nextDefaultSlot } : { message: "not available" };
+  return nextDefaultSlot
+    ? { standard: nextDefaultSlot }
+    : { message: "not available" };
 };
 
 function formatHours(openingInfo) {
@@ -674,30 +675,49 @@ const createList = async (
   });
 };
 
-const updateListDetails=async(updatedFields,user_id,list_id)=>{
+const updateListDetails = async (updatedFields, user_id, list_id) => {
+  const sql = `UPDATE lists SET ? WHERE user_id = ? AND id = ?;`;
 
-  const sql=`UPDATE lists SET ? WHERE user_id = ? AND id = ?;`
+  return db.query(sql, [updatedFields, user_id, list_id]);
+};
 
-  return db.query(sql,[updatedFields,user_id,list_id])
-}
+const insertListItems = async (user_id, list_id, product_ids) => {
+  if (product_ids.length == 0) return;
 
-const insertListItems=async(user_id, list_id,product_ids)=>{
-    if(product_ids.length==0) return;
+  const [owner] = await db.query(
+    "SELECT user_id FROM lists WHERE id=? AND user_id=?;",
+    [list_id, user_id]
+  );
+  if (owner.length == 0) {
+    throw new Error("List does not belong to the user");
+  }
 
-    const [owner]=await db.query('SELECT user_id FROM lists WHERE id=? AND user_id=?;',[list_id,user_id]);
-    if(owner.length==0){
-      throw new Error('List does not belong to the user');
-    }
+  const placeholders = product_ids.map(() => "(?, ?)").join(", ");
+  const values = product_ids.flatMap((product_id) => [list_id, product_id]);
+  const sql = `INSERT INTO list_items (list_id,product_id) VALUES ${placeholders}`;
 
-    const placeholders = product_ids.map(() => '(?, ?)').join(", ");
-    const values = product_ids.flatMap(product_id => [list_id, product_id]);
-    const sql=`INSERT INTO list_items (list_id,product_id) VALUES ${placeholders}`
+  return await db.query(sql, values);
+};
 
-    return await db.query(sql,values)
-}
+const updateListItems = async (user_id, list_id, product_ids) => {
+  if (product_ids.length == 0) return;
 
-const findListDetails=async(user_id,store_id)=>{
-  let sql=`
+  const [owner] = await db.query(
+    "SELECT user_id FROM lists WHERE id=? AND user_id=?;",
+    [list_id, user_id]
+  );
+  if (owner.length == 0) {
+    throw new Error("List does not belong to the user");
+  }
+
+  return await db.query(
+    "DELETE FROM list_items WHERE list_id = ? AND product_id IN (?)",
+    [list_id, product_ids]
+  );
+};
+
+const findListDetails = async (user_id, store_id) => {
+  let sql = `
   SELECT
     l.id AS list_id,
     l.store_id,
@@ -733,19 +753,19 @@ const findListDetails=async(user_id,store_id)=>{
   WHERE l.user_id=?
   `;
 
-  const params=[user_id]
+  const params = [user_id];
 
-  if(store_id){
-    sql+=' AND l.store_id=?;'
+  if (store_id) {
+    sql += " AND l.store_id=?;";
     params.push(store_id);
   }
 
-  return await db.query(sql,params);
-}
+  return await db.query(sql, params);
+};
 
-const findCoverImagesOfList=async()=>{
-  return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`)
-}
+const findCoverImagesOfList = async () => {
+  return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`);
+};
 module.exports = {
   getMainCategories,
   getAllStores,
@@ -773,6 +793,7 @@ module.exports = {
   createList,
   updateListDetails,
   insertListItems,
+  updateListItems,
   findListDetails,
-  findCoverImagesOfList
+  findCoverImagesOfList,
 };
