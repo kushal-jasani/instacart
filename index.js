@@ -3,8 +3,7 @@ const app=express();
 const bodyparser = require("body-parser");
 require("dotenv").config();
 
-const authRoutes=require('./routes/auth')
-const userRoutes=require('./routes/user');
+const appRoutes=require('./src/routes/index')
 
 app.use(bodyparser.json());
 app.use((req, res, next) => {
@@ -14,8 +13,5 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(authRoutes);
-app.use('/userprofile',userRoutes);
-
-
+app.use(appRoutes);
 app.listen(process.env.PORT);

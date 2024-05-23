@@ -1,4 +1,3 @@
-require("dotenv").config();
 
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
@@ -14,8 +13,22 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
 } = require("../util/jwt");
-const { findUser, insertUser, updatePasswordAndToken, addTokenToUser, generateToken } = require("../repository/auth");
-const { resetPasswordSchema, sendOtpRegisterSchema, verifyOtpRegisterSchema, loginSchema, verifyLoginSchema, refreshAccessTokenSchema, postResetPasswordSchema } = require("../helper/validation_schema");
+const {
+  findUser,
+  insertUser,
+  updatePasswordAndToken,
+  addTokenToUser,
+  generateToken,
+} = require("../repository/auth");
+const {
+  resetPasswordSchema,
+  sendOtpRegisterSchema,
+  verifyOtpRegisterSchema,
+  loginSchema,
+  verifyLoginSchema,
+  refreshAccessTokenSchema,
+  postResetPasswordSchema,
+} = require("../validator/validation_schema");
 
 exports.sendOtpRegister = async (req, res, next) => {
   try {
@@ -23,18 +36,18 @@ exports.sendOtpRegister = async (req, res, next) => {
     let isEmail = email !== undefined;
 
     const { error } = sendOtpRegisterSchema.validate(req.body);
-  if (error) {
-    return sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        status: "error",
-        statusCode: 400,
-        msg: error.details[0].message
-      })
-    );
-  }
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const [userResults] = await findUser(
       isEmail ? { email } : { phoneno: phoneno }
     );
@@ -160,19 +173,19 @@ exports.varifyOtpRegister = async (req, res, next) => {
   try {
     const { email, country_code, phoneno, password, otpid, enteredotp } =
       req.body;
-      const { error } = verifyOtpRegisterSchema.validate(req.body);
-      if (error) {
-        return sendHttpResponse(
-          req,
-          res,
-          next,
-          generateResponse({
-            status: "error",
-            statusCode: 400,
-            msg: error.details[0].message
-          })
-        );
-      }
+    const { error } = verifyOtpRegisterSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const phonewithcountrycode = country_code + phoneno;
 
     const varificationresponse = await otpless.verifyOTP(
@@ -199,7 +212,7 @@ exports.varifyOtpRegister = async (req, res, next) => {
 
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
-      const is_verify=phoneno?1:0;
+      const is_verify = phoneno ? 1 : 0;
       [userResults] = await insertUser(
         email,
         country_code,
@@ -227,15 +240,17 @@ exports.varifyOtpRegister = async (req, res, next) => {
       );
     }
     return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          statusCode: 404,
-          status: "error",
-          msg: varificationresponse.reason ? varificationresponse.reason : "entered otp is wrong,please try again😓",
-        })
-      );
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 404,
+        status: "error",
+        msg: varificationresponse.reason
+          ? varificationresponse.reason
+          : "entered otp is wrong,please try again😓",
+      })
+    );
   } catch (error) {
     console.log(error);
     return sendHttpResponse(
@@ -251,9 +266,9 @@ exports.varifyOtpRegister = async (req, res, next) => {
   }
 };
 
-exports.login=async(req,res,next)=>{
-  try{
-    const {email,password,phoneno,country_code}=req.body;
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password, phoneno, country_code } = req.body;
 
     const { error } = loginSchema.validate(req.body);
     if (error) {
@@ -264,7 +279,7 @@ exports.login=async(req,res,next)=>{
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
@@ -272,7 +287,7 @@ exports.login=async(req,res,next)=>{
     let user;
     if (isEmail) {
       [user] = await findUser({ email });
-      if (user.length==0) {
+      if (user.length == 0) {
         return sendHttpResponse(
           req,
           res,
@@ -297,8 +312,7 @@ exports.login=async(req,res,next)=>{
           })
         );
       }
-    }
-    else{
+    } else {
       [user] = await findUser({ phoneno });
       if (!user) {
         return sendHttpResponse(
@@ -354,7 +368,6 @@ exports.login=async(req,res,next)=>{
       );
     }
 
-   
     const accessToken = generateAccessToken(user[0].id);
     const refreshToken = generateRefreshToken(user[0].id);
 
@@ -371,8 +384,7 @@ exports.login=async(req,res,next)=>{
         msg: "Login successful✅",
       })
     );
-  }
-  catch(error){
+  } catch (error) {
     console.log(error);
     return sendHttpResponse(
       req,
@@ -385,12 +397,11 @@ exports.login=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
-
-exports.verifyOtpLogin=async(req,res,next)=>{
-  try{
-    const { country_code,phoneno, otpid, enteredotp } = req.body;
+exports.verifyOtpLogin = async (req, res, next) => {
+  try {
+    const { country_code, phoneno, otpid, enteredotp } = req.body;
     const { error } = verifyLoginSchema.validate(req.body);
     if (error) {
       return sendHttpResponse(
@@ -400,7 +411,7 @@ exports.verifyOtpLogin=async(req,res,next)=>{
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
@@ -443,7 +454,6 @@ exports.verifyOtpLogin=async(req,res,next)=>{
     }
 
     if (varificationresponse.isOTPVerified === true) {
-
       const accessToken = generateAccessToken(user[0].id);
       const refreshToken = generateRefreshToken(user[0].id);
 
@@ -462,17 +472,18 @@ exports.verifyOtpLogin=async(req,res,next)=>{
       );
     }
     return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          statusCode: 404,
-          status: "error",
-          msg: varificationresponse.reason ? varificationresponse.reason : "entered otp is wrong,please try again😓",
-        })
+      req,
+      res,
+      next,
+      generateResponse({
+        statusCode: 404,
+        status: "error",
+        msg: varificationresponse.reason
+          ? varificationresponse.reason
+          : "entered otp is wrong,please try again😓",
+      })
     );
-  }
-  catch(error){
+  } catch (error) {
     console.log(error);
     return sendHttpResponse(
       req,
@@ -485,24 +496,24 @@ exports.verifyOtpLogin=async(req,res,next)=>{
       })
     );
   }
-}
+};
 
 exports.refreshAccessToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
     const { error } = refreshAccessTokenSchema.validate(req.body);
-  if (error) {
-    return sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        status: "error",
-        statusCode: 400,
-        msg: error.details[0].message
-      })
-    );
-  }
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
     const userId = verifyRefreshToken(refreshToken);
     if (userId === "expired") {
       return sendHttpResponse(
@@ -601,7 +612,6 @@ exports.resendOtp = async (req, res, next) => {
   }
 };
 
-
 exports.resetPasswordLink = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -618,7 +628,7 @@ exports.resetPasswordLink = async (req, res, next) => {
         })
       );
     }
-    const [userResults] = await findUser({email});
+    const [userResults] = await findUser({ email });
     const user = userResults[0];
     if (!user) {
       return sendHttpResponse(
@@ -698,12 +708,12 @@ exports.postResetPassword = async (req, res, next) => {
         generateResponse({
           status: "error",
           statusCode: 400,
-          msg: error.details[0].message
+          msg: error.details[0].message,
         })
       );
     }
-    
-    const [userresults] = await findUser({resettoken});
+
+    const [userresults] = await findUser({ resettoken });
     const user = userresults[0];
 
     if (!user) {
@@ -761,5 +771,3 @@ exports.postResetPassword = async (req, res, next) => {
     );
   }
 };
-
-
