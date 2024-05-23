@@ -1,10 +1,18 @@
 const bcrypt = require("bcryptjs");
 const otpless = require("otpless-node-js-auth-sdk");
 
-const { generateResponse, sendHttpResponse } = require("../helper/response");
+const {
+  generateResponse,
+  sendHttpResponse,
+} = require("../helper/response");
 const { findUser } = require("../repository/auth");
 const { findPasswordOfUser, updateUser } = require("../repository/user");
-const { changeEmailSchema, changePasswordSchema, changeNameSchema, changePhoneNumberSchema } = require("../helper/user_section_schema");
+const {
+  changeEmailSchema,
+  changePasswordSchema,
+  changeNameSchema,
+  changePhoneNumberSchema,
+} = require('../validator/user_section_schema');
 const clientId = process.env.OTPLESS_CLIENTID;
 const clientSecret = process.env.OTPLESS_CLIETSECRET;
 
@@ -14,7 +22,6 @@ exports.changeEmail = async (req, res, next) => {
     const userId = req.user.userId;
 
     let updatedField = {};
-
 
     const { error } = changeEmailSchema.validate(req.body);
     if (error) {
@@ -133,7 +140,7 @@ exports.postChangePassword = async (req, res, next) => {
         })
       );
     }
-   
+
     if (newPassword !== confirmNewPassword) {
       return sendHttpResponse(
         req,
@@ -233,7 +240,6 @@ exports.postChangePhoneNumber = async (req, res, next) => {
     const { country_code, phoneno, action } = req.body;
     const userId = req.user.userId;
 
-    
     const { error } = changePhoneNumberSchema.validate(req.body);
     if (error) {
       return sendHttpResponse(
@@ -247,7 +253,6 @@ exports.postChangePhoneNumber = async (req, res, next) => {
         })
       );
     }
-
 
     const [isRegistered] = await findUser({ phoneno: phoneno });
     if (isRegistered.length > 0 && isRegistered[0].id === userId) {
@@ -425,7 +430,6 @@ exports.verifyChangedPhoneNumber = async (req, res, next) => {
 
 exports.userInformation = async (req, res, next) => {
   try {
-
     const userId = req.user.userId;
     const [userResults] = await findUser({ id: userId });
     if (!userResults || userResults.length == 0) {
@@ -451,12 +455,14 @@ exports.userInformation = async (req, res, next) => {
       phoneno: phoneno,
     };
 
-    if(phoneno){
-      userData.is_verify=is_verify,
-      userData.phoneNumberStatus = is_verify === 1 ? "verified" : "unverified",
-      userData.phoneNumberStatusMessage=is_verify === 1
-          ? "Your phone number is verified"
-          : "Unverified. Verify your number to secure your account."
+    if (phoneno) {
+      (userData.is_verify = is_verify),
+        (userData.phoneNumberStatus =
+          is_verify === 1 ? "verified" : "unverified"),
+        (userData.phoneNumberStatusMessage =
+          is_verify === 1
+            ? "Your phone number is verified"
+            : "Unverified. Verify your number to secure your account.");
     }
 
     return sendHttpResponse(

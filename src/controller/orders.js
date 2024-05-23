@@ -1,6 +1,8 @@
-require("dotenv").config();
 
-const { generateResponse, sendHttpResponse } = require("../helper/response");
+const {
+  generateResponse,
+  sendHttpResponse,
+} = require("../helper/response");
 const uuid = require("uuid");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -34,7 +36,7 @@ const {
   pickupOrderSchema,
   addressSchema,
   editAddressSchema,
-} = require("../helper/order_schema");
+} = require('../validator/order_schema');
 
 function generateInvoiceNumber() {
   return uuid.v4();
@@ -436,19 +438,19 @@ exports.editAddress = async (req, res, next) => {
     const { street, zip_code, floor, business_name, latitude, longitude } =
       req.body;
 
-      const { error } = editAddressSchema.validate(req.body);
-      if (error) {
-        return sendHttpResponse(
-          req,
-          res,
-          next,
-          generateResponse({
-            status: "error",
-            statusCode: 400,
-            msg: error.details[0].message,
-          })
-        );
-      }
+    const { error } = editAddressSchema.validate(req.body);
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: error.details[0].message,
+        })
+      );
+    }
 
     const [addressDetails] = await findAddressFromId(addressId, userId);
     if (!addressDetails || addressDetails.length == 0) {
@@ -529,7 +531,6 @@ exports.deleteAddress = async (req, res, next) => {
     );
   }
 };
-
 
 exports.getDeliverySlots = async (req, res, next) => {
   try {

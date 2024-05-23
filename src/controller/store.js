@@ -1,4 +1,7 @@
-const { generateResponse, sendHttpResponse } = require("../helper/response");
+const {
+  generateResponse,
+  sendHttpResponse,
+} = require("../helper/response");
 const {
   getMainCategories,
   getAllStores,
@@ -845,17 +848,17 @@ exports.getList = async (req, res, next) => {
       );
     }
 
-    const storeIds=[...new Set(listDetails.map(item=>item.store_id))];
-    const{todayRows,tomorrowRows}=await getNextDeliveryTime(storeIds);
-    const deliveryTimes={};
+    const storeIds = [...new Set(listDetails.map((item) => item.store_id))];
+    const { todayRows, tomorrowRows } = await getNextDeliveryTime(storeIds);
+    const deliveryTimes = {};
 
-    todayRows.forEach(row => {
+    todayRows.forEach((row) => {
       if (!deliveryTimes[row.store_id]) {
         deliveryTimes[row.store_id] = row.time_slot;
       }
     });
 
-    tomorrowRows.forEach(row => {
+    tomorrowRows.forEach((row) => {
       if (!deliveryTimes[row.store_id]) {
         deliveryTimes[row.store_id] = row.time_slot;
       }
@@ -867,9 +870,9 @@ exports.getList = async (req, res, next) => {
         acc.push({
           list_id: item.list_id,
           store_id: item.store_id,
-          store_name:item.store_name,
-          store_logo:item.store_logo,
-          next_delivery_time:deliveryTimes[item.store_id]||null,
+          store_name: item.store_name,
+          store_logo: item.store_logo,
+          next_delivery_time: deliveryTimes[item.store_id] || null,
           user_id: item.user_id,
           title: item.title,
           decrtiption: item.description,

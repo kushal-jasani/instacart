@@ -133,10 +133,11 @@ const editAddressSchema = Joi.object({
   latitude: Joi.number().precision(8).optional(),
   longitude: Joi.number().precision(8).optional(),
 });
+
 module.exports = {
   deliveryOrderSchema,
   pickupOrderSchema,
   calculateSubTotalSchema,
   addressSchema,
-  editAddressSchema
+  editAddressSchema,
 };
