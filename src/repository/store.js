@@ -1,3 +1,4 @@
+const { date } = require("joi");
 const db = require("../util/database");
 
 const getMainCategories = async () => {
@@ -420,13 +421,19 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length == 0) {
     return "not available";
   }
-  var today = new Date().getDay();
-  var currentTime = new Date();
-  console.log('currtime',currentTime)
-  var currentHours = currentTime.getHours();
 
-  var currentMinutes = currentTime.getMinutes();
-  var currentTimeInMinutes = currentHours * 60 + currentMinutes;
+  const currentDate = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });;
+  // currentDate.setMinutes(new Date(currentDate).getMinutes() - 60);
+  const today = new Date(currentDate).getDay();
+  const currentTime = new Date(currentDate).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const currentHours =new Date(currentDate).getHours();
+  const currentMinutes = new Date(currentDate).getMinutes();
+  const currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
   const findNextSlot = (timings, type) => {
     for (let i = 0; i < timings.length; i++) {
