@@ -1,3 +1,4 @@
+const { date } = require("joi");
 const db = require("../util/database");
 
 const getMainCategories = async () => {
@@ -413,102 +414,22 @@ const convertTo24Hour = (time) => {
   );
 };
 
-// const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
-//   if (!deliveryTimings || deliveryTimings.length == 0) {
-//     return "not available";
-//   }
-//   var today = new Date().getDay();
-//   var currentTime = new Date();
-//   var currentHours = currentTime.getHours();
-
-//   var currentMinutes = currentTime.getMinutes();
-//   var currentTimeInMinutes = currentHours * 60 + currentMinutes;
-
-//   const findNextSlot = (timings, type) => {
-//     for (let i = 0; i < timings.length; i++) {
-//       const deliveryTime = timings[i];
-//       const timeSlotParts = deliveryTime.time_slot.split(" - ");
-//       const startTime = convertTo24Hour(timeSlotParts[0]);
-//       const endTime = convertTo24Hour(timeSlotParts[1]);
-//       const startTimeParts = startTime.split(":");
-//       const endTimeParts = endTime.split(":");
-
-//       const startHours = parseInt(startTimeParts[0]);
-//       const startMinutes = parseInt(startTimeParts[1]);
-//       const endHours = parseInt(endTimeParts[0]);
-//       const endMinutes = parseInt(endTimeParts[1]);
-
-//       const startTimeInMinutes = startHours * 60 + startMinutes;
-//       const endTimeInMinutes = endHours * 60 + endMinutes;
-
-//       if (parseInt(deliveryTime.day) === today) {
-//         if (
-//           currentTimeInMinutes >= startTimeInMinutes &&
-//           currentTimeInMinutes < endTimeInMinutes
-//         ) {
-//           if (i < timings.length - 1) {
-//             const nextDeliveryTime = timings[i + 1];
-//             return {
-//               day: "Today",
-//               time_slot: nextDeliveryTime.time_slot,
-//               type: nextDeliveryTime.type,
-//               price: `${nextDeliveryTime.price}`,
-//             };
-//           } else {
-//             const nextDay = today === 6 ? 0 : today + 1;
-//             for (let j = 0; j < timings.length; j++) {
-//               if (parseInt(timings[j].day) === nextDay) {
-//                 return {
-//                   day: "Tomorrow",
-//                   time_slot: timings[j].time_slot,
-//                   type: timings[j].type,
-//                   price: `${timings[j].price}`,
-//                 };
-//               }
-//             }
-//           }
-//         }
-//       } else if (parseInt(deliveryTime.day) > today) {
-//         return {
-//           day: getDayName(parseInt(deliveryTime.day)),
-//           time_slot: deliveryTime.time_slot,
-//           type: deliveryTime.type,
-//           price: `${deliveryTime.price}`,
-//         };
-//       }
-//     }
-//     return null;
-//   };
-
-//   let nextDefaultSlot = findNextSlot(deliveryTimings, "Standard");
-//   let nextPrioritySlot = priorityTimings
-//     ? findNextSlot(priorityTimings, "Priority")
-//     : null;
-
-//   if (nextPrioritySlot) {
-//     return { standard: nextDefaultSlot, priority: nextPrioritySlot };
-//   }
-//   return nextDefaultSlot
-//     ? { standard: nextDefaultSlot }
-//     : { message: "not available" };
-// };
-
 const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   if (!deliveryTimings || deliveryTimings.length === 0) {
     return "not available";
   }
 
-  const currentDate = new Date();
-  currentDate.setMinutes(currentDate.getMinutes() - 60);
-  const today = currentDate.getDay();
-  const currentTime = currentDate.toLocaleTimeString("en-US", {
+  const currentDate = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });;
+  // currentDate.setMinutes(new Date(currentDate).getMinutes() - 60);
+  const today = new Date(currentDate).getDay();
+  const currentTime = new Date(currentDate).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
 
-  const currentHours = currentDate.getHours();
-  const currentMinutes = currentDate.getMinutes();
+  const currentHours =new Date(currentDate).getHours();
+  const currentMinutes = new Date(currentDate).getMinutes();
   const currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
   const findNextSlot = (timings) => {
