@@ -30,7 +30,7 @@ const {
   verifyLoginSchema,
   refreshAccessTokenSchema,
   postResetPasswordSchema,
-} = require("../validator.js/validation_schema");
+} = require("../validator/validation_schema");
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
