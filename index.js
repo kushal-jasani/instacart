@@ -3,10 +3,10 @@ const app=express();
 const bodyparser = require("body-parser");
 const passport=require('passport')
 require("dotenv").config();
-const {useGoogleStrategy}=require('./util/passport');
+const {useGoogleStrategy}=require('./src/util/passport');
 
 useGoogleStrategy();
-const authRoutes=require('./routes/auth')
+const appRoutes=require('./src/routes/index')
 
 app.use(bodyparser.json());
 
@@ -19,6 +19,5 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(authRoutes);
-
+app.use(appRoutes);
 app.listen(process.env.PORT);

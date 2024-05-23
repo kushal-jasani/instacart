@@ -30,7 +30,7 @@ const {
   verifyLoginSchema,
   refreshAccessTokenSchema,
   postResetPasswordSchema,
-} = require("../helper/validation_schema");
+} = require("../validator.js/validation_schema");
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
@@ -58,11 +58,15 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
         window.localStorage.setItem('refreshToken', '${refreshToken}');
 
         // Redirect browser to root of application
-        window.location.href = ${process.env.NODE_ENV==='production' ? process.env.REDIRECT_LIVE  : process.env.REDIRECT_LOCAL};
+        window.location.href = ${
+          process.env.NODE_ENV === "production"
+            ? process.env.REDIRECT_LIVE
+            : process.env.REDIRECT_LOCAL
+        };
       </script>
     </html>
     `;
-    res.send(htmlWithEmbeddedJWT)
+    res.send(htmlWithEmbeddedJWT);
   } catch (error) {
     console.log("Error in loginOrRegisterWithGoogle", error);
     return sendHttpResponse(
