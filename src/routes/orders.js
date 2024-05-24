@@ -4,6 +4,9 @@ const ordersController = require("../controller/orders");
 const { isAuth } = require("../middleware/is_auth");
 
 router.post("/orders/checkout", isAuth, ordersController.processOrder);
+router.get('/orders/my-orders',isAuth,ordersController.getOrders);
+router.get('/orders/my-orders/orderdetail',isAuth,ordersController.getOrderDetails);
+
 
 router.post("/add-address", isAuth, ordersController.addAddress);
 router.post(

@@ -71,6 +71,112 @@ const insertPaymentDetails = async (orderId, payment_mode) => {
   });
 };
 
+const findOrdersOfUser = async (user_id) => {
+  const sql = `
+      SELECT 
+        o.id AS order_id,
+        o.status,
+        o.delivery_address_id,
+        o.subtotal,
+        o.delivery_type,
+        o.delivery_day,
+        o.delivery_slot,
+        o.payment_mode,
+        o.pickup_address_id,
+        o.pickup_day,
+        o.pickup_slot,
+        o.pickup_fee,
+        o.created_at,
+        o.updated_at,
+        COUNT(ot.id) AS items_count
+      FROM orders o
+      LEFT JOIN order_items ot ON o.id = ot.order_id 
+      WHERE o.user_id = ?
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `;
+  return await db.query(sql, [user_id]);
+};
+
+const findOrderDetails = async (user_id, order_id) => {
+  const sql = `
+  SELECT 
+    o.id AS order_id,
+    o.store_id,
+    o.status,
+    o.delivery_address_id,
+    o.delivery_instructions,
+    o.is_leave_it_door,
+    o.actual_subtotal,
+    o.final_subtotal,
+    o.subtotal,
+    o.service_fee,
+    o.bag_fee,
+    o.discount_applied,
+    o.delivery_fee,
+    o.delivery_type,
+    o.delivery_day,
+    o.delivery_slot,
+    o.country_code,
+    o.mobile_number,
+    o.payment_mode,
+    o.gift_recipitent_name,
+    o.recipitent_country_code,
+    o.recipitent_mobile,
+    o.gift_sender_name,
+    o.gift_card_image_id,
+    o.gift_message,
+    o.pickup_address_id,
+    o.pickup_day,
+    o.pickup_slot,
+    o.pickup_fee,
+    o.created_at,
+    o.updated_at,
+    da.street AS delivery_street,
+    da.floor AS delivery_floor,
+    da.business_name AS delivery_business_name,
+    da.zip_code AS delivery_zip_code,
+    da.latitude AS delivery_latitude,
+    da.longitude AS delivery_longitude,
+    sa.address AS store_address,
+    sa.city AS store_city,
+    sa.state AS store_state,
+    sa.country AS store_country,
+    sa.zip_code AS store_zip_code,
+    sa.latitude AS store_latitude,
+    sa.longitude AS store_longitude,
+    pd.invoice AS payment_invoice,
+    pd.status AS payment_status,
+    pd.type AS payment_type,
+    s.name AS store_name,
+    s.logo AS store_logo
+  FROM orders o
+  LEFT JOIN delivery_address da ON o.delivery_address_id = da.id
+  LEFT JOIN store_address sa ON o.store_id = sa.store_id
+  LEFT JOIN payment_details pd ON o.id = pd.order_id
+  LEFT JOIN store s ON s.id=o.store_id
+  WHERE o.user_id = ? AND o.id=?
+`;
+  return await db.query(sql, [user_id,order_id]);
+};
+
+const findOrderItems = async (orderIds) => {
+  const sql = `
+  SELECT 
+    oi.order_id,
+    oi.product_id,
+    oi.quantity,
+    oi.price,
+    p.title AS product_title,
+    (SELECT i.image FROM images i WHERE oi.product_id = i.id)AS product_image
+  FROM order_items oi
+  LEFT JOIN products p ON oi.product_id = p.id
+  LEFT JOIN images i ON oi.product_id = i.id
+  WHERE oi.order_id IN (?)
+`;
+  return await db.query(sql, [orderIds]);
+};
+
 const insertAddress = async (
   userId,
   street,
@@ -207,6 +313,9 @@ module.exports = {
   insertOrderItems,
   insertPaymentDetails,
   insertAddress,
+  findOrdersOfUser,
+  findOrderItems,
+  findOrderDetails,
   findAddressDetails,
   findAddressFromId,
   updateAddress,

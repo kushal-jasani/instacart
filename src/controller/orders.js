@@ -1,8 +1,4 @@
-
-const {
-  generateResponse,
-  sendHttpResponse,
-} = require("../helper/response");
+const { generateResponse, sendHttpResponse } = require("../helper/response");
 const uuid = require("uuid");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -23,6 +19,9 @@ const {
   findPickupAddressDetails,
   updateAddress,
   deleteAddressFromId,
+  findOrdersOfUser,
+  findOrderItems,
+  findOrderDetails,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -36,7 +35,7 @@ const {
   pickupOrderSchema,
   addressSchema,
   editAddressSchema,
-} = require('../validator/order_schema');
+} = require("../validator/order_schema");
 
 function generateInvoiceNumber() {
   return uuid.v4();
@@ -208,8 +207,33 @@ exports.webhook = async (req, res, next) => {
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
     let event, orderId, invoiceNumber, paymentDetail;
 
-    event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
-
+    try {
+      event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+    } catch (err) {
+      console.error(
+        `⚠️ Webhook signature verification failed: ${err.message}`
+      );
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 500,
+          msg: err.message,
+        })
+      );
+    }
+    sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: { received: true },
+      })
+    );
     switch (event.type) {
       case "payment_intent.succeeded":
         const paymentIntentSucceeded = event.data.object;
@@ -238,6 +262,16 @@ exports.webhook = async (req, res, next) => {
 
       case "payment_intent.created":
         const paymentIntentCreated = event.data.object;
+        // sendHttpResponse(
+        //   req,
+        //   res,
+        //   next,
+        //   generateResponse({
+        //     status: "success",
+        //     statusCode: 201,
+        //     msg: "Payment intent created!",
+        //   })
+        // );
         // Then define and call a function to handle the event payment_intent.created
         break;
 
@@ -327,6 +361,235 @@ exports.getStoreAddressForPickup = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "internal server error while fetching store pickup address👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getOrders = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const [orderResult] = await findOrdersOfUser(userId);
+
+    if (!orderResult || orderResult.length === 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "No orders found",
+        })
+      );
+    }
+
+    const current_orders = {
+      delivery_orders: [],
+      pickup_orders: [],
+    };
+
+    const past_orders = {
+      delivery_orders: [],
+      pickup_orders: [],
+    };
+
+    const orders = orderResult.map((order) => {
+      const orderData = {
+        order_id: order.order_id,
+        items_count: order.items_count,
+        order_status: order.status,
+        subtotal: order.subtotal,
+      };
+
+      if (order.delivery_address_id) {
+        orderData.delivery_day = order.delivery_day;
+        orderData.delivery_slot = order.delivery_slot;
+      } else {
+        orderData.pickup_day = order.pickup_day;
+        orderData.pickup_slot = order.pickup_slot;
+      }
+
+      const isCurrentOrder =
+        order.status === "pending" ||
+        order.status === "in_progress" ||
+        order.status === "placed" ||
+        order.status === "shipped";
+
+      if (isCurrentOrder) {
+        if (order.delivery_address_id) {
+          current_orders.delivery_orders.push(orderData);
+        } else {
+          current_orders.pickup_orders.push(orderData);
+        }
+      } else {
+        if (order.delivery_address_id) {
+          past_orders.delivery_orders.push(orderData);
+        } else {
+          past_orders.pickup_orders.push(orderData);
+        }
+      }
+    });
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: { current_orders, past_orders },
+        msg: "Order fetched successfully",
+      })
+    );
+  } catch (error) {
+    console.log("error while fetching orders:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while fetching orders👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getOrderDetails = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { orderId } = req.query;
+
+    if (!orderId) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: "Order ID is required🚨",
+        })
+      );
+    }
+
+    const [orderResults] = await findOrderDetails(userId, orderId);
+    const orderResult = orderResults[0];
+    if (!orderResult || orderResult.length === 0) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "Order not found❌",
+        })
+      );
+    }
+
+    const [orderItemsRows] = await findOrderItems(orderId);
+
+    const items = orderItemsRows.map((item) => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      price: item.price,
+      title: item.product_title,
+      image: item.product_image,
+    }));
+
+    const address = orderResult.delivery_address_id
+      ? {
+          type: "delivery",
+          street: orderResult.delivery_street,
+          floor: orderResult.delivery_floor,
+          business_name: orderResult.delivery_business_name,
+          zip_code: orderResult.delivery_zip_code,
+          latitude: orderResult.delivery_latitude,
+          longitude: orderResult.delivery_longitude,
+        }
+      : {
+          type: "pickup",
+          address: orderResult.store_address,
+          city: orderResult.store_city,
+          state: orderResult.store_state,
+          country: orderResult.store_country,
+          zip_code: orderResult.store_zip_code,
+          latitude: orderResult.store_latitude,
+          longitude: orderResult.store_longitude,
+        };
+
+    const orderData = {
+      order_id: orderResult.order_id,
+      order_status: orderResult.status,
+      store_id: orderResult.store_id,
+      store_name: orderResult.store_name,
+      store_logo: orderResult.store_logo,
+      country_code: orderResult.country_code,
+      mobile_number: orderResult.mobile_number,
+      created_at: orderResult.created_at,
+      updated_at: orderResult.updated_at,
+      address,
+      payment_details: {
+        invoice: orderResult.payment_invoice,
+        status: orderResult.payment_status,
+        type: orderResult.payment_type,
+        actual_subtotal: orderResult.actual_subtotal,
+        final_subtotal: orderResult.final_subtotal,
+        service_fee: orderResult.service_fee,
+        bag_fee: orderResult.bag_fee,
+        ...{
+          [orderResult.delivery_address_id ? "delivery_fee" : "pickup_fee"]:
+            orderResult.delivery_address_id
+              ? orderResult.delivery_fee
+              : orderResult.pickup_fee,
+        },
+        subtotal: orderResult.subtotal,
+        discount_applied: orderResult.discount_applied,
+      },
+      items,
+    };
+
+    if (orderResult.delivery_address_id) {
+      orderData.delivery_day = orderResult.delivery_day;
+      orderData.delivery_slot = orderResult.delivery_slot;
+      if (orderResult.gift_recipitent_name) {
+        orderData.gift_recipitent_name = orderResult.gift_recipitent_name;
+        orderData.recipitent_country_code = orderResult.recipitent_country_code;
+        orderData.recipitent_mobile = orderResult.recipitent_mobile;
+        orderData.gift_sender_name = orderResult.gift_sender_name;
+        orderData.gift_card_image_id = orderResult.gift_card_image_id;
+        orderData.gift_message = orderResult.gift_message;
+      }
+    } else {
+      orderData.pickup_day = orderResult.pickup_day;
+      orderData.pickup_slot = orderResult.pickup_slot;
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: { orderData },
+        msg: "Order details fetched successfully🥳",
+      })
+    );
+  } catch (error) {
+    console.log("error while fetching ordersdetails:", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "internal server error while fetching orderdetails👨🏻‍🔧",
       })
     );
   }
