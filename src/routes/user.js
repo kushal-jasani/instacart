@@ -1,7 +1,7 @@
 const express=require('express');
 const router=express.Router();
 const userController=require('../controller/user');
-const {isAuth}=require('../middleware/is-auth')
+const {isAuth}=require('../middleware/is_auth')
 
 router.post('/changeemail',isAuth,userController.changeEmail);
 router.post('/changepassword',isAuth,userController.postChangePassword);

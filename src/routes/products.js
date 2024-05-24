@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const {checkLoggedIn}=require('../middleware/checkLoggedIn')
-const {isAuth}=require('../middleware/is-auth')
+const {checkLoggedIn}=require('../middleware/check_loggedin')
+const {isAuth}=require('../middleware/is_auth')
 const productController=require('../controller/products');
 
 router.get('/:productId',checkLoggedIn,isAuth,productController.getProductDetail);

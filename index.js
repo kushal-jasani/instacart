@@ -3,15 +3,11 @@ const app=express();
 const bodyparser = require("body-parser");
 const passport=require('passport')
 require("dotenv").config();
-const {useGoogleStrategy}=require('./util/passport');
+const {useGoogleStrategy}=require('./src/util/passport');
 const session=require('express-session')
 
 useGoogleStrategy();
-const authRoutes=require('./routes/auth')
-const userRoutes=require('./routes/user');
-const storeRoutes=require('./routes/store')
-const productRoutes=require('./routes/products');
-
+const appRoutes=require('./src/routes/index')
 
 app.use(bodyparser.json());
 
@@ -30,9 +26,5 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(authRoutes);
-app.use('/userprofile',userRoutes);
-app.use('/store',storeRoutes);
-app.use('/products',productRoutes)
-
+app.use(appRoutes);
 app.listen(process.env.PORT);

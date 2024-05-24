@@ -4,7 +4,7 @@ const otpless = require("otpless-node-js-auth-sdk");
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 const { findUser } = require("../repository/auth");
 const { findPasswordOfUser, updateUser } = require("../repository/user");
-const { changeEmailSchema, changePasswordSchema, changeNameSchema, changePhoneNumberSchema } = require("../helper/user_section_schema");
+const { changeEmailSchema, changePasswordSchema, changeNameSchema, changePhoneNumberSchema } = require('../validator/user_section_schema');
 const clientId = process.env.OTPLESS_CLIENTID;
 const clientSecret = process.env.OTPLESS_CLIETSECRET;
 
