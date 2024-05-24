@@ -1,5 +1,3 @@
-require("dotenv").config();
-
 const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 const otpless = require("otpless-node-js-auth-sdk");

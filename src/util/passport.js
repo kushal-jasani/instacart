@@ -1,4 +1,3 @@
-require("dotenv").config();
 
 const passport = require("passport");
 const { findUser, insertUser } = require("../repository/auth");
