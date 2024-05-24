@@ -415,7 +415,7 @@ const convertTo24Hour = (time) => {
 };
 
 const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
-  if (!deliveryTimings || deliveryTimings.length === 0) {
+  if (!deliveryTimings || deliveryTimings.length == 0) {
     return "not available";
   }
 
@@ -432,14 +432,19 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
   const currentMinutes = new Date(currentDate).getMinutes();
   const currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
-  const findNextSlot = (timings) => {
+  const findNextSlot = (timings, type) => {
     for (let i = 0; i < timings.length; i++) {
       const deliveryTime = timings[i];
       const timeSlotParts = deliveryTime.time_slot.split(" - ");
       const startTime = convertTo24Hour(timeSlotParts[0]);
       const endTime = convertTo24Hour(timeSlotParts[1]);
-      const [startHours, startMinutes] = startTime.split(":").map(Number);
-      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      const startTimeParts = startTime.split(":");
+      const endTimeParts = endTime.split(":");
+
+      const startHours = parseInt(startTimeParts[0]);
+      const startMinutes = parseInt(startTimeParts[1]);
+      const endHours = parseInt(endTimeParts[0]);
+      const endMinutes = parseInt(endTimeParts[1]);
 
       const startTimeInMinutes = startHours * 60 + startMinutes;
       const endTimeInMinutes =  endHours * 60 + endMinutes;
@@ -483,8 +488,10 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
     return null;
   };
 
-  let nextDefaultSlot = findNextSlot(deliveryTimings);
-  let nextPrioritySlot = priorityTimings ? findNextSlot(priorityTimings) : null;
+  let nextDefaultSlot = findNextSlot(deliveryTimings, "Standard");
+  let nextPrioritySlot = priorityTimings
+    ? findNextSlot(priorityTimings, "Priority")
+    : null;
 
   if (nextPrioritySlot) {
     return { standard: nextDefaultSlot, priority: nextPrioritySlot };
