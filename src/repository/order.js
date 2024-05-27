@@ -244,6 +244,7 @@ const cartItemsDetailWithDiscount = async (productIds, store_id) => {
   SELECT
       p.id AS product_id,
       pq.selling_price AS price,
+      p.category_id,
       p.discount_id,
       d.buy_quantity,
       d.get_quantity,
@@ -308,6 +309,12 @@ const updatePaymentDetails = async (order_id, invoicenumber, type, status) => {
   );
 };
 
+const findStoreDiscount=async(store_id)=>{
+  return await db.query(`SELECT sd.id,sd.store_id,sd.category_id,sd.discount_type,sd.discount_amt,sd.min_required_order 
+  FROM store_discount sd 
+  WHERE sd.store_id=?`,[store_id])
+}
+
 module.exports = {
   insertOrder,
   insertOrderItems,
@@ -328,4 +335,5 @@ module.exports = {
   getPaymentDetails,
   updateOrderStatus,
   updatePaymentDetails,
+  findStoreDiscount
 };

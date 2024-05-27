@@ -22,6 +22,7 @@ const {
   findOrdersOfUser,
   findOrderItems,
   findOrderDetails,
+  findStoreDiscount,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -210,9 +211,7 @@ exports.webhook = async (req, res, next) => {
     try {
       event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
     } catch (err) {
-      console.error(
-        `⚠️ Webhook signature verification failed: ${err.message}`
-      );
+      console.error(`⚠️ Webhook signature verification failed: ${err.message}`);
       return sendHttpResponse(
         req,
         res,
@@ -918,6 +917,41 @@ exports.calculateSubTotal = async (req, res, next) => {
       }
       item_subtotal += final_price;
       original_item_subtotal += original_final_price;
+    }
+    const [storeDiscount] = await findStoreDiscount(store_id);
+
+    if (storeDiscount) {
+      const { category_id, discount_type, discount_amt, min_required_order } = storeDiscount[0];
+
+      if(!category_id){
+        if (item_subtotal >= parseFloat(min_required_order)) {
+          if (discount_type === "fixed") {
+            discount_applied += parseFloat(discount_amt);
+          } else if (discount_type === "rate") {
+            discount_applied += (item_subtotal * parseFloat(discount_amt)) / 100;
+          }
+        }
+      }
+      else {
+        const categorySubtotal = cart_items
+          .filter(
+            (item) =>
+              productDetails[item.product_id].category_id === category_id
+          )
+          .reduce(
+            (sum, item) =>
+              sum + productDetails[item.product_id].price * item.quantity,
+            0
+          );
+        if (categorySubtotal >= parseFloat(min_required_order)) {
+          if (discount_type === "fixed") {
+            discount_applied += parseFloat(discount_amt);
+          } else if (discount_type === "rate") {
+            discount_applied +=
+              (categorySubtotal * parseFloat(discount_amt)) / 100;
+          }
+        }
+      }
     }
 
     const [storePricingResults] = await findStorePricing(store_id);
