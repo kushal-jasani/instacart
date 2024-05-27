@@ -22,6 +22,26 @@ const checkInStorePrices = async (storeIds) => {
   );
 };
 
+const getDiscountStores = async () => {
+  return await db.query(`SELECT s.id, s.name, s.logo,s.is_pickup_avail,
+  JSON_ARRAYAGG(sc.name) AS store_categories,sd.category_id,sd.discount_amt,sd.discount_type
+  FROM store s
+  LEFT JOIN store_category sc ON s.id = sc.store_id
+  INNER JOIN store_discount sd ON s.id = sd.store_id
+  GROUP BY s.id,s.name,s.logo,sd.category_id,sd.discount_amt,sd.discount_type;`);
+};
+
+const getCategoryNames=async(categoryIds)=>{
+  const [categories]=db.query(`SELECT id,name
+  FROM store_products_categories
+  WHERE id IN (?);`,[categoryIds])
+  const categoryMap = {};
+  categories.forEach(category => {
+    categoryMap[category.id] = category.name;
+  });
+  return categoryMap;
+}
+
 const getNextDeliveryTime = async (storeIds) => {
   const currentDate = new Date();
   currentDate.setMinutes(currentDate.getMinutes() - 60);
@@ -419,7 +439,9 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
     return "not available";
   }
 
-  const currentDate = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });;
+  const currentDate = new Date().toLocaleString("en-US", {
+    timeZone: "Asia/Kolkata",
+  });
   // currentDate.setMinutes(new Date(currentDate).getMinutes() - 60);
   const today = new Date(currentDate).getDay();
   const currentTime = new Date(currentDate).toLocaleTimeString("en-US", {
@@ -428,7 +450,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
     hour12: true,
   });
 
-  const currentHours =new Date(currentDate).getHours();
+  const currentHours = new Date(currentDate).getHours();
   const currentMinutes = new Date(currentDate).getMinutes();
   const currentTimeInMinutes = currentHours * 60 + currentMinutes;
 
@@ -447,7 +469,7 @@ const getNextDeliverySlot = (deliveryTimings, priorityTimings) => {
       const endMinutes = parseInt(endTimeParts[1]);
 
       const startTimeInMinutes = startHours * 60 + startMinutes;
-      const endTimeInMinutes =  endHours * 60 + endMinutes;
+      const endTimeInMinutes = endHours * 60 + endMinutes;
 
       if (parseInt(deliveryTime.day) === today) {
         if (
@@ -604,7 +626,7 @@ const createList = async (
 };
 
 const updateListDetails = async (updatedFields, user_id, list_id) => {
-  const sql = `UPDATE lists SET ? WHERE user_id = ? AND id = ?;`
+  const sql = `UPDATE lists SET ? WHERE user_id = ? AND id = ?;`;
 
   return db.query(sql, [updatedFields, user_id, list_id]);
 };
@@ -686,7 +708,7 @@ const findListDetails = async (user_id, store_id) => {
 };
 
 const findCoverImagesOfList = async () => {
-  return await db.query( `SELECT id,image FROM images WHERE is_cover=1;`);
+  return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`);
 };
 module.exports = {
   getMainCategories,
@@ -717,5 +739,7 @@ module.exports = {
   insertListItems,
   updateListItems,
   findListDetails,
-  findCoverImagesOfList
+  findCoverImagesOfList,
+  getDiscountStores,
+  getCategoryNames
 };
