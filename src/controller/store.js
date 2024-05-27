@@ -35,6 +35,9 @@ const {
   findCoverImagesOfList,
   updateListDetails,
   updateListItems,
+  getDiscountStores,
+  getcategoryNames,
+  getCategoryNames,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -100,17 +103,7 @@ exports.getStoresByCategory = async (req, res, next) => {
     } else if (main_category_id === "2") {
       [stores] = await getStoresOpenAfterEleven();
     } else if (main_category_id === "3") {
-      // For main_category_id 3 (offers), we won't handle it here.
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 404,
-          msg: "Functionality for offers category will be implemented later.",
-        })
-      );
+      [stores] = await getDiscountStores();
     } else if (main_category_id === "4") {
       [stores] = await getPickupAvailableStores();
     } else {
@@ -131,6 +124,16 @@ exports.getStoresByCategory = async (req, res, next) => {
     const storeIds = stores.map((store) => store.id);
     const [inStorePrices] = await checkInStorePrices(storeIds);
     const { todayRows, tomorrowRows } = await getNextDeliveryTime(storeIds);
+
+    let categoryNames = {};
+    if (main_category_id == 3) {
+      const categoryIds = stores
+        .filter((store) => store.category_id)
+        .map((store) => store.category_id);
+      if (categoryIds.length > 0) {
+        categoryNames = await getCategoryNames(categoryIds);
+      }
+    }
 
     const singleResData = stores.map((store) => {
       const messages = [];
@@ -159,12 +162,23 @@ exports.getStoresByCategory = async (req, res, next) => {
         messages.push(`Delivery by Tomorrow, ${tomorrowUpperSlot}`);
       }
 
+      let discount = null;
+      if (main_category_id == 3) {
+        discount = {
+          category_id: store.category_id,
+          category_name: categoryNames[store.category_id],
+          discount_type: store.discount_type,
+          discount_amount: store.discount_amt,
+        };
+      }
+
       return {
         store_id: store.id,
         store_name: store.name,
         image_url: store.logo,
         store_categories: store.store_categories,
         messages,
+        discount,
       };
     });
 
