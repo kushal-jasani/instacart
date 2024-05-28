@@ -36,8 +36,10 @@ const {
   updateListDetails,
   updateListItems,
   getDiscountStores,
-  getcategoryNames,
   getCategoryNames,
+  findGiftStores,
+  findGiftImages,
+  getGiftProducts,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -96,6 +98,9 @@ exports.categoryFilter = async (req, res, next) => {
 exports.getStoresByCategory = async (req, res, next) => {
   try {
     let { main_category_id } = req.query;
+    let giftStoreCount = 0;
+    let giftBannerImages;
+
     main_category_id = main_category_id > 14 ? "1" : main_category_id;
     let stores;
     if (main_category_id === "1") {
@@ -106,6 +111,11 @@ exports.getStoresByCategory = async (req, res, next) => {
       [stores] = await getDiscountStores();
     } else if (main_category_id === "4") {
       [stores] = await getPickupAvailableStores();
+    } else if (main_category_id === "8") {
+      [stores] = await findGiftStores();
+      [giftBannerImages] = await findGiftImages();
+      giftBannerImages = giftBannerImages[0].gift_banners;
+      giftStoreCount = stores.length;
     } else {
       [stores] = await getStoreByCategory(main_category_id);
     }
@@ -178,7 +188,7 @@ exports.getStoresByCategory = async (req, res, next) => {
         image_url: store.logo,
         store_categories: store.store_categories,
         messages,
-        discount,
+        ...(main_category_id === "3" && { discount }),
       };
     });
 
@@ -190,7 +200,11 @@ exports.getStoresByCategory = async (req, res, next) => {
         status: "success",
         statusCode: 200,
         msg: "Stores retrieved successfully.✅",
-        data: singleResData,
+        data: {
+          storeData: singleResData,
+          ...(main_category_id === "8" && { giftStoreCount }),
+          ...(main_category_id === "8" && { giftBannerImages }),
+        },
       })
     );
   } catch (error) {
@@ -203,6 +217,99 @@ exports.getStoresByCategory = async (req, res, next) => {
         status: "error",
         statusCode: 500,
         msg: "Internal server error while fetching stores👨🏻‍🔧",
+      })
+    );
+  }
+};
+
+exports.getProductsForGiftsStore = async (req, res, next) => {
+  try {
+    let {storeId} = req.query;
+  
+    if (!storeId) {
+      const [giftStores] = await findGiftStores();
+      if (giftStores.length === 0) {
+        return sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "error",
+            statusCode: 404,
+            msg: "No gift stores available.❌",
+          })
+        );
+      }
+      storeId = giftStores[0].id;
+    }
+
+    const [products] = await getGiftProducts(storeId);
+
+    const productsByCategory = {
+      Flowers: [],
+      Wine: [],
+      Chocolates: [],
+      Champagne: [],
+      Dessert: [],
+    };
+
+    products.forEach(product => {
+      let formattedProduct;
+      if(product.product_id){
+        formattedProduct = {
+          id: product.product_id,
+          title: product.product_title,
+          image: product.product_image,
+          label:
+            product.quantity === 1
+              ? `${product.quantity_variant} ${product.unit}`
+              : `${product.quantity} × ${product.quantity_variant} ${product.unit}`,
+          actual_price: product.actual_price,
+          selling_price: product.selling_price,
+          ...(product.discount_id !== null && {
+            discount_label: generateDiscountLabel(product),
+          }),
+        };  
+
+      if (product.category_name.includes("Flowers") || product.subcategory_name.includes("Flowers")) {
+        productsByCategory.Flowers.push(formattedProduct);
+      }
+      if (product.category_name.includes("Wine") || product.subcategory_name.includes("Wine")) {
+        productsByCategory.Wine.push(formattedProduct);
+      }
+      if (product.category_name.includes("Champagne") || product.subcategory_name.includes("Champagne")) {
+        productsByCategory.Champagne.push(formattedProduct);
+      }
+      else if (product.category_name.includes("Chocolates") || product.subcategory_name.includes("Chocolates")) {
+        productsByCategory.Chocolates.push(formattedProduct);
+      }
+      else if (product.category_name.includes("Cake") || product.subcategory_name.includes("Cake")) {
+        productsByCategory.Dessert.push(formattedProduct);
+      }
+      }
+    });
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        data: {store_id:storeId,productsByCategory},
+        msg: "Products retrieved successfully.",
+      })
+    );
+  } catch (error) {
+    console.log("Error while fetching products for gifts stores: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while fetching products for gifts stores👨🏻‍🔧",
       })
     );
   }

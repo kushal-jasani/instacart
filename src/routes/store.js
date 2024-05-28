@@ -5,6 +5,10 @@ const { isAuth } = require("../middleware/is_auth");
 
 router.get("/categorylist", storeController.categoryFilter);
 router.get("/category", storeController.getStoresByCategory);
+router.get(
+  "/category/populargifts",
+  storeController.getProductsForGiftsStore
+);
 
 router.get("/:storeId/front", storeController.getStoreDetailsFront);
 router.get("/:storeId/info", storeController.getStoreDetailsInside);
