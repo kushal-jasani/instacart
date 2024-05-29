@@ -227,7 +227,7 @@ exports.sendOtpRegister = async (req, res, next) => {
 
 exports.verifyOtpRegister = async (req, res, next) => {
   try {
-    const { email, country_code, phoneno, password, otpid, enteredotp,referral_code } =
+    const { email, country_code, phoneno, password, otpid, enteredotp, referral_code } =
       req.body;
     const { error } = verifyOtpRegisterSchema.validate(req.body);
     if (error) {
