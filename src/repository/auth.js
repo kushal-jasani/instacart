@@ -78,7 +78,6 @@ const insertReferral=async(userId,code)=>{
   return db.query(sql,[userId,code])
 }
 
-
 const generateReferralCode = (userId, email, phoneno) => {
   const baseString = `${email || ''}${phoneno || ''}${userId}`;
   return crypto.createHash('sha256').update(baseString).digest('hex').substr(0, 8);
