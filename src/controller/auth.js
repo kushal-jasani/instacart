@@ -20,6 +20,10 @@ const {
   updatePasswordAndToken,
   addTokenToUser,
   generateToken,
+  insertReferral,
+  findReferralByCode,
+  updateUserReferral,
+  generateReferralCode,
 } = require("../repository/auth");
 
 const {
@@ -223,7 +227,7 @@ exports.sendOtpRegister = async (req, res, next) => {
 
 exports.verifyOtpRegister = async (req, res, next) => {
   try {
-    const { email, country_code, phoneno, password, otpid, enteredotp } =
+    const { email, country_code, phoneno, password, otpid, enteredotp,referral_code } =
       req.body;
     const { error } = verifyOtpRegisterSchema.validate(req.body);
     if (error) {
@@ -312,6 +316,17 @@ exports.verifyOtpRegister = async (req, res, next) => {
       );
 
       const userId = userResults.insertId;
+      const referralCode=generateReferralCode(userId,email,phoneno);
+      await insertReferral(userId,referralCode);
+
+      if(referral_code){
+        const [referralResults]=await findReferralByCode(referral_code);
+        if(referralResults.length>0){
+          // const referrerId = referralResults[0].user_id;
+          // await updateReferral(referrerId, 10);
+          await updateUserReferral(userId, referral_code);
+        }
+      }
       const accessToken = generateAccessToken(userId);
       const refreshToken = generateRefreshToken(userId);
 

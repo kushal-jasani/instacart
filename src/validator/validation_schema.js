@@ -21,7 +21,8 @@ const sendOtpRegisterSchema = Joi.object({
     }),
     password: Joi.string().min(8).required(),
     otpid: Joi.string().required(),
-    enteredotp: Joi.string().pattern(/^\d{6}$/).required()
+    enteredotp: Joi.string().pattern(/^\d{6}$/).required(),
+    referral_code: Joi.string().optional(),
   }).xor('email', 'phoneno');
 
   const loginSchema = Joi.object({
