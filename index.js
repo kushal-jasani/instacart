@@ -37,5 +37,4 @@ app.use((req, res, next) => {
 });
 
 app.use(appRoutes);
-app.use(appRoutes);
 app.listen(process.env.PORT);
