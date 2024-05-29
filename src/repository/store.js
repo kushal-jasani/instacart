@@ -710,6 +710,86 @@ const findListDetails = async (user_id, store_id) => {
 const findCoverImagesOfList = async () => {
   return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`);
 };
+
+const findGiftStores=async()=>{
+  const sql = `
+  SELECT DISTINCT s.id, s.name, s.logo
+  FROM store s
+  LEFT JOIN store_products_categories spc ON s.id = spc.store_id
+  LEFT JOIN store_products_subcategories spsc ON s.id = spsc.store_id
+  WHERE spc.name LIKE '%Flowers%' 
+     OR spc.name LIKE '%Wine%' 
+     OR spc.name LIKE '%Chocolates%' 
+     OR spc.name LIKE '%Champagne%' 
+     OR spc.name LIKE '%Dessert%' 
+     OR spsc.name LIKE '%Flowers%' 
+     OR spsc.name LIKE '%Wine%' 
+     OR spsc.name LIKE '%Chocolates%' 
+     OR spsc.name LIKE '%Champagne%' 
+     OR spsc.name LIKE '%Cake%'
+  GROUP BY
+    s.id,
+    s.name,s.logo
+`;
+  return await db.query(sql);
+}
+
+const findGiftImages=async()=>{
+  return await db.query(`SELECT JSON_ARRAYAGG(i.image) AS gift_banners FROM images i WHERE is_gift=2`);
+}
+
+
+const getGiftProducts = async (store_id) => {
+  const sql=`
+  SELECT 
+    spc.id AS category_id,
+    spc.name AS category_name,
+    sps.id AS subcategory_id,
+    sps.name AS subcategory_name,
+    p.id AS product_id,
+    p.title AS product_title,
+    (SELECT pi.image FROM images pi WHERE p.id = pi.product_id LIMIT 1) AS product_image,
+    pq.quantity AS quantity,
+    pq.quantity_varient AS quantity_variant,
+    pq.unit AS unit,
+    pq.actual_price AS actual_price,
+    pq.selling_price AS selling_price,
+    p.discount_id,
+    d.buy_quantity,
+    d.get_quantity,
+    d.discount_type,
+    d.discount
+  FROM
+    store_products_categories spc
+  LEFT JOIN 
+    store_products_subcategories sps ON spc.id = sps.category_id
+  LEFT JOIN 
+    products p ON sps.id = p.subcategory_id
+  LEFT JOIN 
+    discounts d ON p.discount_id = d.id
+  LEFT JOIN 
+    product_quantity pq ON p.id = pq.product_id
+    WHERE 
+    spc.store_id=? AND (
+    spc.name LIKE '%Flowers%' 
+    OR sps.name LIKE '%Flowers%'
+    OR spc.name LIKE '%Wine%' 
+    OR sps.name LIKE '%Wine%'
+    OR spc.name LIKE '%Chocolates%' 
+    OR sps.name LIKE '%Chocolates%'
+    OR spc.name LIKE '%Champagne%' 
+    OR sps.name LIKE '%Champagne%'
+    OR spc.name LIKE '%Dessert%' 
+    OR sps.name LIKE '%Dessert%'
+  )
+  GROUP BY 
+    spc.id, spc.name, sps.id, sps.name, p.id, p.title, p.discount_id, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, d.buy_quantity, d.get_quantity, d.discount_type, d.discount;
+  `;
+
+  return await db.query(sql,[store_id])
+};
+
+
 module.exports = {
   getMainCategories,
   getAllStores,
@@ -741,5 +821,8 @@ module.exports = {
   findListDetails,
   findCoverImagesOfList,
   getDiscountStores,
-  getCategoryNames
+  getCategoryNames,
+  findGiftStores,
+  findGiftImages,
+  getGiftProducts
 };
