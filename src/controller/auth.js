@@ -322,8 +322,6 @@ exports.verifyOtpRegister = async (req, res, next) => {
       if(referral_code){
         const [referralResults]=await findReferralByCode(referral_code);
         if(referralResults.length>0){
-          // const referrerId = referralResults[0].user_id;
-          // await updateReferral(referrerId, 10);
           await updateUserReferral(userId, referral_code);
         }
       }
