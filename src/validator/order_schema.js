@@ -61,6 +61,7 @@ const deliveryOrderSchema = Joi.object({
   pickup_day: Joi.forbidden(),
   pickup_slot: Joi.forbidden(),
   pickup_fee: Joi.forbidden(),
+  use_referral_bonus: Joi.boolean().required(),
 });
 
 const pickupOrderSchema = Joi.object({
@@ -100,6 +101,7 @@ const pickupOrderSchema = Joi.object({
   pickup_day: Joi.string().required(),
   pickup_slot: Joi.string().required(),
   pickup_fee: Joi.number().required(),
+  use_referral_bonus: Joi.boolean().required(),
 });
 
 const calculateSubTotalSchema = Joi.object({

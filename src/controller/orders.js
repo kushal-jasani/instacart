@@ -27,6 +27,8 @@ const {
   findUserById,
   findReferralByCode,
   updateReferralBonus,
+  deductReferralAmount,
+  getReferralAmount,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -78,6 +80,7 @@ exports.processOrder = async (req, res, next) => {
       pickup_day,
       pickup_slot,
       pickup_fee,
+      use_referral_bonus
     } = req.body;
 
     const userId = req.user.userId;
@@ -122,7 +125,24 @@ exports.processOrder = async (req, res, next) => {
       );
       delivery_address_id = deliveryAddress.insertId;
     }
-    
+    const [referralResults] = await getReferralAmount(userId);
+    let earnedAmt = referralResults.length > 0 ? referralResults[0].earned_amt : 0;
+    earnedAmt=parseFloat(earnedAmt);
+
+    if (use_referral_bonus && earnedAmt > 0) {
+      if (subtotal <= earnedAmt) {
+        earnedAmt = subtotal; 
+        subtotal = 0;
+      } else {
+        subtotal -= earnedAmt; 
+      }
+
+      // Update the referral amount in the database
+      await deductReferralAmount(userId, earnedAmt);
+    } else {
+      earnedAmt = 0;
+    }
+
     const orderData = {
       user_id: req.user.userId,
       store_id,
@@ -158,6 +178,7 @@ exports.processOrder = async (req, res, next) => {
       pickup_day: pickup_address_id ? pickup_day : null,
       pickup_slot: pickup_address_id ? pickup_slot : null,
       pickup_fee: pickup_address_id ? pickup_fee : null,
+      referral_bonus_used: earnedAmt,
     };
 
     const [orderResult] = await insertOrder(orderData);
@@ -895,6 +916,12 @@ exports.calculateSubTotal = async (req, res, next) => {
         })
       );
     }
+
+    const userId = req.user.userId;
+    const [referralResults] = await getReferralAmount(userId);
+    let earnedAmt = referralResults.length > 0 ? referralResults[0].earned_amt : 0.0;
+    earnedAmt=parseFloat(earnedAmt);
+
     const productIds = cart_items.map((p) => p.product_id);
 
     const [productResults] = await cartItemsDetailWithDiscount(
@@ -1015,6 +1042,7 @@ exports.calculateSubTotal = async (req, res, next) => {
           bag_fee: bag_fee.toFixed(2),
           subtotal: subTotal.toFixed(2),
           discount_applied: discount_applied.toFixed(2),
+          referral_bonus: earnedAmt.toFixed(2),
         },
         msg: "Subtotal calculated successfully",
       })
