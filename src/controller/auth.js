@@ -316,6 +316,15 @@ exports.verifyOtpRegister = async (req, res, next) => {
       );
 
       const userId = userResults.insertId;
+      const referralCode=generateReferralCode(userId,email,phoneno);
+      await insertReferral(userId,referralCode);
+
+      if(referral_code){
+        const [referralResults]=await findReferralByCode(referral_code);
+        if(referralResults.length>0){
+          await updateUserReferral(userId, referral_code);
+        }
+      }
       const accessToken = generateAccessToken(userId);
       const refreshToken = generateRefreshToken(userId);
 
