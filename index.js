@@ -8,7 +8,6 @@ const session = require("express-session");
 
 useGoogleStrategy();
 const appRoutes=require('./src/routes/index')
-const appRoutes=require('./src/routes/index')
 
 app.use(
   bodyparser.json({

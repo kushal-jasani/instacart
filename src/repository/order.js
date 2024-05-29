@@ -61,7 +61,7 @@ const insertOrderItems = async (orderId, cart_items) => {
   return await db.query(sql);
 };
 
-const insertPaymentDetails = async (orderId, payment_mode) => {
+const insertPaymentDetails = async (orderId,payment_mode) => {
   const sql = `INSERT INTO payment_details set ?;`;
   return await db.query(sql, {
     order_id: orderId,
@@ -290,7 +290,9 @@ const findGiftCardImages = async () => {
 };
 
 const getPaymentDetails = async (order_id) => {
-  return await db.query(`SELECT * FROM payment_details WHERE order_id=?;`, [
+  return await db.query(`SELECT *,o.user_id FROM payment_details
+  JOIN orders o ON o.id=payment_details.order_id
+  WHERE order_id=?;`, [
     order_id,
   ]);
 };
@@ -315,6 +317,26 @@ const findStoreDiscount=async(store_id)=>{
   WHERE sd.store_id=?`,[store_id])
 }
 
+const countOrdersByUserId = (userId) => {
+  const sql = 'SELECT COUNT(*) as count FROM orders WHERE user_id = ?';
+  return db.execute(sql, [userId]);
+};
+
+const findUserById = (userId) => {
+  const sql = 'SELECT id,referral_registered_with FROM users WHERE id = ?';
+  return db.execute(sql, [userId]);
+};
+
+const findReferralByCode = (code) => {
+  const sql = 'SELECT * FROM referrals WHERE code = ?';
+  return db.execute(sql, [code]);
+};
+
+const updateReferralBonus = (userId, amount) => {
+  const sql = 'UPDATE referrals SET earned_amt = earned_amt + ? WHERE user_id = ?';
+  return db.execute(sql, [amount, userId]);
+};
+
 module.exports = {
   insertOrder,
   insertOrderItems,
@@ -335,5 +357,9 @@ module.exports = {
   getPaymentDetails,
   updateOrderStatus,
   updatePaymentDetails,
-  findStoreDiscount
+  countOrdersByUserId,
+  findStoreDiscount,
+  findUserById,
+  findReferralByCode,
+  updateReferralBonus
 };

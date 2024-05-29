@@ -23,6 +23,10 @@ const {
   findOrderItems,
   findOrderDetails,
   findStoreDiscount,
+  countOrdersByUserId,
+  findUserById,
+  findReferralByCode,
+  updateReferralBonus,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -118,7 +122,7 @@ exports.processOrder = async (req, res, next) => {
       );
       delivery_address_id = deliveryAddress.insertId;
     }
-
+    
     const orderData = {
       user_id: req.user.userId,
       store_id,
@@ -159,7 +163,7 @@ exports.processOrder = async (req, res, next) => {
     const [orderResult] = await insertOrder(orderData);
     const orderId = orderResult.insertId;
     await insertOrderItems(orderId, cart_items);
-    await insertPaymentDetails(orderId, payment_mode);
+    await insertPaymentDetails(orderId,payment_mode);
 
     let paymentIntent;
     paymentIntent = await stripe.paymentIntents.create({
@@ -252,6 +256,25 @@ exports.webhook = async (req, res, next) => {
           paymentIntentSucceeded.payment_method_types[0],
           paymentIntentSucceeded.status
         );
+
+        const userId = paymentDetail[0].user_id;
+
+        const [orderCountResult] = await countOrdersByUserId(userId);
+        const orderCount = orderCountResult[0].count;
+
+        if (orderCount === 1) {
+          const [userResult] = await findUserById(userId);
+          const referralCode = userResult[0].referral_registered_with;
+
+          if (referralCode) {
+            const [referralResults] = await findReferralByCode(referralCode);
+            if (referralResults.length > 0) {
+              const referrerId = referralResults[0].user_id;
+              await updateReferralBonus(referrerId, 10); 
+              await updateReferralBonus(userId, 10);
+            }
+          }
+        }
         break;
 
       case "payment_intent.canceled":
