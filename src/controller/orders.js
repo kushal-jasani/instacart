@@ -860,7 +860,7 @@ exports.calculateSubTotal = async (req, res, next) => {
         })
       );
     }
-    if ((delivery_fee && pickup_fee) || (!delivery_fee && !pickup_fee)) {
+    if ((delivery_fee && pickup_fee) || (delivery_fee===undefined && pickup_fee===undefined)) {
       return sendHttpResponse(
         req,
         res,
@@ -971,9 +971,9 @@ exports.calculateSubTotal = async (req, res, next) => {
     if (storePricing.has_bag_fee) {
       bag_fee = Math.max(storePricing.bag_fee, 0);
     }
-    const applied_fee = delivery_fee ? delivery_fee : pickup_fee;
-
-    const subTotal = item_subtotal + applied_fee + service_fee + bag_fee;
+    const applied_fee = delivery_fee!==undefined ? parseFloat(delivery_fee) : parseFloat(pickup_fee);
+    
+    const subTotal = item_subtotal + parseFloat(applied_fee) + service_fee + bag_fee;
     return sendHttpResponse(
       req,
       res,
