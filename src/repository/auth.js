@@ -39,20 +39,52 @@ const updatePasswordAndToken = async (hashedNewPassword, userId) => {
     );
   };
 
-  const generateToken = (length, expiryhours) => {
-    return new Promise((resolve, reject) => {
-      crypto.randomBytes(length, async (err, buf) => {
-        if (err) {
-          reject(err);
-        } else {
-          const resettoken = buf.toString("hex");
-          const resettokenexpiry = new Date(
-            Date.now() + expiryhours * 3600 * 1000
-          );
-          resolve({ resettoken, resettokenexpiry });
-        }
-      });
+const generateToken = (length, expiryhours) => {
+  return new Promise((resolve, reject) => {
+    crypto.randomBytes(length, async (err, buf) => {
+      if (err) {
+        reject(err);
+      } else {
+        const resettoken = buf.toString("hex");
+        const resettokenexpiry = new Date(
+          Date.now() + expiryhours * 3600 * 1000
+        );
+        resolve({ resettoken, resettokenexpiry });
+      }
     });
-  };
+  });
+};
 
-module.exports={findUser,insertUser,addTokenToUser,updatePasswordAndToken,generateToken}
+const findReferralByCode=async(code)=>{
+  const sql=`SELECT * FROM referrals WHERE code=?`;
+  return db.query(sql,[code]);
+};
+
+const updateUserReferral=async(userId,referralCode)=>{
+  const sql=`UPDATE users SET referral_registered_with=? WHERE id=?`;
+  return db.query(sql,[referralCode,userId]);
+};
+
+const insertReferral=async(userId,code)=>{
+  const sql=`INSERT INTO referrals (user_id,code,earned_amt) VALUES (?,?,0)`;
+  return db.query(sql,[userId,code])
+}
+
+
+const generateReferralCode = (userId, email, phoneno) => {
+  const baseString = `${email || ''}${phoneno || ''}${userId}`;
+  return crypto.createHash('sha256').update(baseString).digest('hex').substr(0, 8);
+};
+
+
+module.exports = {
+  findUser,
+  insertUser,
+  addTokenToUser,
+  updatePasswordAndToken,
+  generateToken,
+  findReferralByCode,
+  updateUserReferral,
+  insertReferral,
+  generateReferralCode
+};
