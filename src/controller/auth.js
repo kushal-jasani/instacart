@@ -1,5 +1,4 @@
-
-const { generateResponse, sendHttpResponse } = require('../helper/response');
+const { generateResponse, sendHttpResponse } = require("../helper/response");
 
 const otpless = require("otpless-node-js-auth-sdk");
 const bcrypt = require("bcryptjs");
@@ -19,8 +18,11 @@ const {
   updatePasswordAndToken,
   addTokenToUser,
   generateToken,
+  insertReferral,
+  findReferralByCode,
+  updateUserReferral,
+  generateReferralCode,
 } = require("../repository/auth");
-
 const {
   resetPasswordSchema,
   sendOtpRegisterSchema,
@@ -33,7 +35,6 @@ const {
 
 exports.loginOrRegisterWithGoogle = async (req, res, next) => {
   try {
-    
     if (!req.user) {
       return sendHttpResponse(
         req,
@@ -50,29 +51,23 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
 
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
-    // const htmlWithEmbeddedJWT = `
-    // <html>
-    //   <script>
-    //     // Save JWT to localStorage
-    //     window.localStorage.setItem('accessToken','${accessToken}');
-    //     window.localStorage.setItem('refreshToken','${refreshToken}');
+    const htmlWithEmbeddedJWT = `
+    <html>
+      <script>
+        // Save JWT to localStorage
+        window.localStorage.setItem('accessToken', '${accessToken}');
+        window.localStorage.setItem('refreshToken', '${refreshToken}');
 
-    //     // Redirect browser to root of application
-    //     window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
-    //   </script>
-    // </html>
-    // `;
-
-    res.cookie("accessToken", accessToken);
-    // console.log(htmlWithEmbeddedJWT)
-    // res.send(htmlWithEmbeddedJWT)
-    res.cookie("refreshToken", refreshToken);
-    const url = `${
-      process.env.NODE_ENV === "production"
-        ? process.env.REDIRECT_LIVE
-        : process.env.REDIRECT_LOCAL
-    }`;
-    res.redirect(url);
+        // Redirect browser to root of application
+        window.location.href = ${
+          process.env.NODE_ENV === "production"
+            ? process.env.REDIRECT_LIVE
+            : process.env.REDIRECT_LOCAL
+        };
+      </script>
+    </html>
+    `;
+    res.send(htmlWithEmbeddedJWT);
   } catch (error) {
     console.log("Error in loginOrRegisterWithGoogle", error);
     return sendHttpResponse(
@@ -229,7 +224,7 @@ exports.sendOtpRegister = async (req, res, next) => {
 
 exports.verifyOtpRegister = async (req, res, next) => {
   try {
-    const { email, country_code, phoneno, password, otpid, enteredotp } =
+    const { email, country_code, phoneno, password, otpid, enteredotp, referral_code } =
       req.body;
     const { error } = verifyOtpRegisterSchema.validate(req.body);
     if (error) {
@@ -241,34 +236,6 @@ exports.verifyOtpRegister = async (req, res, next) => {
           status: "error",
           statusCode: 400,
           msg: error.details[0].message,
-        })
-      );
-    }
-    let isEmail = email !== undefined;
-    const [userResults] = await findUser(
-      isEmail ? { email } : { phoneno: phoneno }
-    );
-    if (isEmail && userResults.length > 0) {
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 400,
-          msg: "User with given email number already exists👀",
-        })
-      );
-    }
-    if (!isEmail && userResults.length > 0) {
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 400,
-          msg: "User with given phone number already exists👀",
         })
       );
     }
@@ -299,25 +266,24 @@ exports.verifyOtpRegister = async (req, res, next) => {
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
       const is_verify = phoneno ? 1 : 0;
-      let firstName, lastName;
-      const from_google = 0;
-
-      if (email) {
-        firstName = email.substring(0, email.indexOf("@"));
-      }
-
-      const [userResults] = await insertUser(
+      [userResults] = await insertUser(
         email,
         country_code,
         phoneno,
-        firstName,
-        lastName,
         is_verify,
-        hashedPassword,
-        from_google
+        hashedPassword
       );
 
       const userId = userResults.insertId;
+      const referralCode=generateReferralCode(userId,email,phoneno);
+      await insertReferral(userId,referralCode);
+
+      if(referral_code){
+        const [referralResults]=await findReferralByCode(referral_code);
+        if(referralResults.length>0){
+          await updateUserReferral(userId, referral_code);
+        }
+      }
       const accessToken = generateAccessToken(userId);
       const refreshToken = generateRefreshToken(userId);
 
@@ -410,7 +376,7 @@ exports.login = async (req, res, next) => {
       }
     } else {
       [user] = await findUser({ phoneno });
-      if (!user || user.length == 0) {
+      if (!user) {
         return sendHttpResponse(
           req,
           res,
@@ -514,7 +480,7 @@ exports.verifyOtpLogin = async (req, res, next) => {
     const phonewithcountrycode = country_code + phoneno;
 
     const [user] = await findUser({ phoneno });
-    if (!user || user.length == 0) {
+    if (!user) {
       return sendHttpResponse(
         req,
         res,
@@ -744,6 +710,8 @@ exports.resetPasswordLink = async (req, res, next) => {
       tokenlength,
       expiryhours
     );
+    // console.log(resettoken);
+    // console.log(resettokenexpiry);
 
     await addTokenToUser(resettoken, resettokenexpiry, email);
 
@@ -810,7 +778,7 @@ exports.postResetPassword = async (req, res, next) => {
     const [userresults] = await findUser({ resettoken });
     const user = userresults[0];
 
-    if (!user || user.length == 0) {
+    if (!user) {
       return sendHttpResponse(
         req,
         res,
