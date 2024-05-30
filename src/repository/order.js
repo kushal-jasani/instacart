@@ -323,7 +323,7 @@ const countOrdersByUserId =async (userId) => {
 };
 
 const findUserById = async(userId) => {
-  const sql = 'SELECT id,referral_registered_with FROM users WHERE id = ?';
+  const sql = 'SELECT id,referral_registered_with,first_name FROM users WHERE id = ?';
   return await db.query(sql, [userId]);
 };
 

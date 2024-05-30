@@ -118,12 +118,16 @@ exports.processOrder = async (req, res, next) => {
     }
 
     let delivery_address_id;
+    let addressDetails;
     if (address_id) {
-      const [addressDetails] = await findAddressFromId(address_id, userId);
+      [addressDetails] = await findAddressFromId(address_id, userId);
       const [deliveryAddress] = await insertIntoDeliveryAddress(
         addressDetails[0]
       );
       delivery_address_id = deliveryAddress.insertId;
+    }
+    else{
+      [addressDetails]=await findPickupAddressDetails(store_id);
     }
     const [referralResults] = await getReferralAmount(userId);
     let earnedAmt = referralResults.length > 0 ? referralResults[0].earned_amt : 0;
@@ -137,7 +141,6 @@ exports.processOrder = async (req, res, next) => {
         subtotal -= earnedAmt; 
       }
 
-      // Update the referral amount in the database
       await deductReferralAmount(userId, earnedAmt);
     } else {
       earnedAmt = 0;
@@ -186,11 +189,24 @@ exports.processOrder = async (req, res, next) => {
     await insertOrderItems(orderId, cart_items);
     await insertPaymentDetails(orderId,payment_mode);
 
-    let paymentIntent;
-    paymentIntent = await stripe.paymentIntents.create({
-      amount: subtotal * 100,
+    const [userResult]=await findUserById(userId);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: parseInt(subtotal) * 100,
       currency: "usd",
       description: "Order payment",
+      shipping: {
+        name: userResult[0].first_name? userResult[0].first_name :'Default Name',
+        address: {
+          line1: addressDetails[0].street ? addressDetails[0].street : addressDetails[0].address,
+          line2: addressDetails[0].floor,
+          postal_code: addressDetails[0].zip_code,
+          city: addressDetails[0].city ? addressDetails[0].city:'San Francisco',
+          state: addressDetails[0].state ? addressDetails[0].state : 'CA',
+          country: 'US',
+        },
+      },
+    
       payment_method_types: ["card"],
       metadata: { orderId },
     });
@@ -350,7 +366,7 @@ exports.webhook = async (req, res, next) => {
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
-  } catch {
+  } catch(error) {
     console.error("Error processing webhook event:", error);
     return sendHttpResponse(
       req,
