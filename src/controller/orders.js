@@ -264,16 +264,7 @@ exports.webhook = async (req, res, next) => {
         })
       );
     }
-    sendHttpResponse(
-      req,
-      res,
-      next,
-      generateResponse({
-        status: "success",
-        statusCode: 200,
-        msg: { received: true },
-      })
-    );
+    
     switch (event.type) {
       case "payment_intent.succeeded":
         const paymentIntentSucceeded = event.data.object;
@@ -321,6 +312,16 @@ exports.webhook = async (req, res, next) => {
 
       case "payment_intent.created":
         const paymentIntentCreated = event.data.object;
+        sendHttpResponse(
+          req,
+          res,
+          next,
+          generateResponse({
+            status: "success",
+            statusCode: 200,
+            msg: { created: true },
+          })
+        );
         // sendHttpResponse(
         //   req,
         //   res,

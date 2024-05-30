@@ -306,7 +306,7 @@ const updateOrderStatus = async (order_id, status) => {
 
 const updatePaymentDetails = async (order_id, invoicenumber, type, status) => {
   return await db.query(
-    `UPDATE payment_details SET invoice_number = ?, type = ?, status = ? WHERE order_id = ?;`,
+    `UPDATE payment_details SET invoice = ?, type = ?, status = ? WHERE order_id = ?;`,
     [invoicenumber, type, status, order_id]
   );
 };
