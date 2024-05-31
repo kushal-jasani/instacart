@@ -29,6 +29,8 @@ const {
   updateReferralBonus,
   deductReferralAmount,
   getReferralAmount,
+  findOrdersCount,
+  findPaginatedOrders,
 } = require("../repository/order");
 const {
   getNextDeliverySlot,
@@ -430,67 +432,70 @@ exports.getOrders = async (req, res, next) => {
   try {
     const userId = req.user.userId;
 
-    const [orderResult] = await findOrdersOfUser(userId);
+    let {
+      currentDeliveryPage,
+      currentDeliveryLimit,
+      currentPickupPage,
+      currentPickupLimit,
+      pastDeliveryPage,
+      pastDeliveryLimit,
+      pastPickupPage,
+      pastPickupLimit,
+    } = req.query;
 
-    if (!orderResult || orderResult.length === 0) {
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 404,
-          msg: "No orders found",
-        })
-      );
+
+    currentDeliveryPage=parseInt(currentDeliveryPage,10)||1;
+    currentDeliveryLimit=parseInt(currentPickupLimit,10)||10;
+    currentPickupPage=parseInt(currentPickupPage,10)||1;
+    currentPickupLimit=parseInt(currentPickupLimit,10)||10;
+
+    pastDeliveryPage=parseInt(pastDeliveryPage,10)||1;
+    pastDeliveryLimit=parseInt(pastDeliveryLimit,10)||10;
+    pastPickupPage=parseInt(pastPickupPage,10)||1;
+    pastPickupLimit=parseInt(pastPickupLimit,10)||10;
+
+    
+    const currentDeliveryOffset = (currentDeliveryPage - 1) * currentDeliveryLimit;
+    const currentPickupOffset = (currentPickupPage - 1) * currentPickupLimit;
+    const pastDeliveryOffset = (pastDeliveryPage - 1) * pastDeliveryLimit;
+    const pastPickupOffset = (pastPickupPage - 1) * pastPickupLimit;
+
+    const currentOrderStatuses = ['pending', 'in_progress', 'placed', 'shipped'];
+    const pastOrderStatuses = ['delivered', 'cancelled', 'returned'];
+
+    const [totalCurrentOrders] = await findOrdersCount(userId, currentOrderStatuses);
+    const [totalPastOrders] = await findOrdersCount(userId, pastOrderStatuses);
+
+    const [currentDeliveryOrders] = await findPaginatedOrders(userId, currentOrderStatuses, currentDeliveryLimit, currentDeliveryOffset, true);
+    const [currentPickupOrders] = await findPaginatedOrders(userId, currentOrderStatuses, currentPickupLimit, currentPickupOffset, false);
+    const [pastDeliveryOrders] = await findPaginatedOrders(userId, pastOrderStatuses, pastDeliveryLimit, pastDeliveryOffset, true);
+    const [pastPickupOrders] = await findPaginatedOrders(userId, pastOrderStatuses, pastPickupLimit, pastPickupOffset, false);
+
+
+    const formatOrderData = (order) => {
+      const orderData={
+      order_id: order.order_id,
+      items_count: order.items_count,
+      order_status: order.status,
+      subtotal: order.subtotal,
+    };
+
+    if (order.delivery_address_id) {
+      orderData.delivery_day = order.delivery_day;
+      orderData.delivery_slot = order.delivery_slot;
+    } else {
+      orderData.pickup_day = order.pickup_day;
+      orderData.pickup_slot = order.pickup_slot;
     }
+    return orderData;
+  };
 
-    const current_orders = {
-      delivery_orders: [],
-      pickup_orders: [],
-    };
 
-    const past_orders = {
-      delivery_orders: [],
-      pickup_orders: [],
-    };
+    const formattedCurrentDelivery = currentDeliveryOrders.map(formatOrderData);
+    const formattedCurrentPickup = currentPickupOrders.map(formatOrderData);
+    const formattedPastDelivery = pastDeliveryOrders.map(formatOrderData);
+    const formattedPastPickup = pastPickupOrders.map(formatOrderData);
 
-    const orders = orderResult.map((order) => {
-      const orderData = {
-        order_id: order.order_id,
-        items_count: order.items_count,
-        order_status: order.status,
-        subtotal: order.subtotal,
-      };
-
-      if (order.delivery_address_id) {
-        orderData.delivery_day = order.delivery_day;
-        orderData.delivery_slot = order.delivery_slot;
-      } else {
-        orderData.pickup_day = order.pickup_day;
-        orderData.pickup_slot = order.pickup_slot;
-      }
-
-      const isCurrentOrder =
-        order.status === "pending" ||
-        order.status === "in_progress" ||
-        order.status === "placed" ||
-        order.status === "shipped";
-
-      if (isCurrentOrder) {
-        if (order.delivery_address_id) {
-          current_orders.delivery_orders.push(orderData);
-        } else {
-          current_orders.pickup_orders.push(orderData);
-        }
-      } else {
-        if (order.delivery_address_id) {
-          past_orders.delivery_orders.push(orderData);
-        } else {
-          past_orders.pickup_orders.push(orderData);
-        }
-      }
-    });
 
     return sendHttpResponse(
       req,
@@ -499,7 +504,37 @@ exports.getOrders = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: { current_orders, past_orders },
+        data: { 
+        
+          current_orders:{
+              delivery_orders:{
+                orders:formattedCurrentDelivery,
+                current_page: currentDeliveryPage,
+                total_pages: Math.ceil(totalCurrentOrders[0].delivery_orders_count / currentDeliveryLimit),
+                total_orders: parseInt(totalCurrentOrders[0].delivery_orders_count),
+              },
+              pickup_orders:{
+                orders:formattedCurrentPickup,
+                current_page: currentPickupPage,
+                total_pages: Math.ceil(totalCurrentOrders[0].pickup_orders_count / currentPickupLimit),
+                total_orders: parseInt(totalCurrentOrders[0].pickup_orders_count),
+              },
+          }, 
+          past_orders:{
+            delivery_orders:{
+              orders:formattedPastDelivery,
+              current_page: pastDeliveryPage,
+              total_pages: Math.ceil(totalPastOrders[0].delivery_orders_count / pastDeliveryLimit),
+              total_orders: parseInt(totalPastOrders[0].delivery_orders_count),
+            },
+            pickup_orders:{
+              orders:formattedPastPickup,
+              current_page: pastPickupPage,
+              total_pages: Math.ceil(totalPastOrders[0].pickup_orders_count / pastPickupLimit),
+              total_orders: parseInt(totalPastOrders[0].pickup_orders_count),
+            },
+          }
+        },
         msg: "Order fetched successfully",
       })
     );

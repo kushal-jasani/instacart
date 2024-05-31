@@ -98,6 +98,46 @@ const findOrdersOfUser = async (user_id) => {
   return await db.query(sql, [user_id]);
 };
 
+const findPaginatedOrders = async (user_id, orderStatus, limit, offset, isDelivery) => {
+  const sql = `
+    SELECT 
+      o.id AS order_id,
+      o.status,
+      o.delivery_address_id,
+      o.subtotal,
+      o.delivery_type,
+      o.delivery_day,
+      o.delivery_slot,
+      o.payment_mode,
+      o.pickup_address_id,
+      o.pickup_day,
+      o.pickup_slot,
+      o.pickup_fee,
+      o.created_at,
+      o.updated_at,
+      COUNT(ot.id) AS items_count
+    FROM orders o
+    LEFT JOIN order_items ot ON o.id = ot.order_id 
+    WHERE o.user_id = ? AND o.status IN (?) AND ${isDelivery ? 'o.delivery_address_id IS NOT NULL' : 'o.delivery_address_id IS NULL'}
+    GROUP BY o.id
+    ORDER BY o.created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  return await db.query(sql, [user_id, orderStatus, limit, offset]);
+};
+
+const findOrdersCount=async(user_id,orderStatus)=>{
+  const sql = `
+  SELECT 
+    COUNT(o.id) AS total_orders,
+    SUM(CASE WHEN o.delivery_address_id IS NOT NULL THEN 1 ELSE 0 END) AS delivery_orders_count,
+    SUM(CASE WHEN o.delivery_address_id IS NULL THEN 1 ELSE 0 END) AS pickup_orders_count
+  FROM orders o
+  WHERE o.user_id = ? AND o.status IN (?)
+`;
+  return await db.query(sql,[user_id,orderStatus])
+};
+
 const findOrderDetails = async (user_id, order_id) => {
   const sql = `
   SELECT 
@@ -373,5 +413,7 @@ module.exports = {
   findReferralByCode,
   updateReferralBonus,
   getReferralAmount,
-  deductReferralAmount
+  deductReferralAmount,
+  findPaginatedOrders,
+  findOrdersCount
 };

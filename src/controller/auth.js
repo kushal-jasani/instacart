@@ -23,7 +23,6 @@ const {
   insertReferral,
   updateUserReferral,
 } = require("../repository/auth");
-
 const {
   resetPasswordSchema,
   sendOtpRegisterSchema,
@@ -52,12 +51,12 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
 
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
-    // const htmlWithEmbeddedJWT = `
-    // <html>
-    //   <script>
-    //     // Save JWT to localStorage
-    //     window.localStorage.setItem('accessToken','${accessToken}');
-    //     window.localStorage.setItem('refreshToken','${refreshToken}');
+    const htmlWithEmbeddedJWT = `
+    <html>
+      <script>
+        // Save JWT to localStorage
+        window.localStorage.setItem('accessToken', '${accessToken}');
+        window.localStorage.setItem('refreshToken', '${refreshToken}');
 
     //     // Redirect browser to root of application
     //     window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
@@ -246,34 +245,6 @@ exports.verifyOtpRegister = async (req, res, next) => {
         })
       );
     }
-    let isEmail = email !== undefined;
-    const [userResults] = await findUser(
-      isEmail ? { email } : { phoneno: phoneno }
-    );
-    if (isEmail && userResults.length > 0) {
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 400,
-          msg: "User with given email number already exists👀",
-        })
-      );
-    }
-    if (!isEmail && userResults.length > 0) {
-      return sendHttpResponse(
-        req,
-        res,
-        next,
-        generateResponse({
-          status: "error",
-          statusCode: 400,
-          msg: "User with given phone number already exists👀",
-        })
-      );
-    }
     const phonewithcountrycode = country_code + phoneno;
 
     const varificationresponse = await otpless.verifyOTP(
@@ -301,22 +272,12 @@ exports.verifyOtpRegister = async (req, res, next) => {
     if (varificationresponse.isOTPVerified === true) {
       const hashedPassword = await bcrypt.hash(password, 8);
       const is_verify = phoneno ? 1 : 0;
-      let firstName, lastName;
-      const from_google = 0;
-
-      if (email) {
-        firstName = email.substring(0, email.indexOf("@"));
-      }
-
-      const [userResults] = await insertUser(
+      [userResults] = await insertUser(
         email,
         country_code,
         phoneno,
-        firstName,
-        lastName,
         is_verify,
-        hashedPassword,
-        from_google
+        hashedPassword
       );
 
       const userId = userResults.insertId;
@@ -421,7 +382,7 @@ exports.login = async (req, res, next) => {
       }
     } else {
       [user] = await findUser({ phoneno });
-      if (!user || user.length == 0) {
+      if (!user) {
         return sendHttpResponse(
           req,
           res,
@@ -525,7 +486,7 @@ exports.verifyOtpLogin = async (req, res, next) => {
     const phonewithcountrycode = country_code + phoneno;
 
     const [user] = await findUser({ phoneno });
-    if (!user || user.length == 0) {
+    if (!user) {
       return sendHttpResponse(
         req,
         res,
@@ -755,6 +716,8 @@ exports.resetPasswordLink = async (req, res, next) => {
       tokenlength,
       expiryhours
     );
+    // console.log(resettoken);
+    // console.log(resettokenexpiry);
 
     await addTokenToUser(resettoken, resettokenexpiry, email);
 
@@ -821,7 +784,7 @@ exports.postResetPassword = async (req, res, next) => {
     const [userresults] = await findUser({ resettoken });
     const user = userresults[0];
 
-    if (!user || user.length == 0) {
+    if (!user) {
       return sendHttpResponse(
         req,
         res,

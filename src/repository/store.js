@@ -31,16 +31,19 @@ const getDiscountStores = async () => {
   GROUP BY s.id,s.name,s.logo,sd.category_id,sd.discount_amt,sd.discount_type;`);
 };
 
-const getCategoryNames=async(categoryIds)=>{
-  const [categories]=db.query(`SELECT id,name
+const getCategoryNames = async (categoryIds) => {
+  const [categories] = await db.query(
+    `SELECT id,name
   FROM store_products_categories
-  WHERE id IN (?);`,[categoryIds])
+  WHERE id IN (?);`,
+    [categoryIds]
+  );
   const categoryMap = {};
-  categories.forEach(category => {
+  categories.forEach((category) => {
     categoryMap[category.id] = category.name;
   });
   return categoryMap;
-}
+};
 
 const getNextDeliveryTime = async (storeIds) => {
   const currentDate = new Date();
@@ -251,7 +254,7 @@ GROUP BY
   );
 };
 
-const findProductsOfSubcategory = async (subcategoryId) => {
+const findProductsOfSubcategory = async (subcategoryId, limit, offset) => {
   const query = `
   SELECT 
     sps.id AS subcategory_id,
@@ -281,8 +284,18 @@ WHERE
     sps.id = ?
 GROUP BY 
     sps.id,sps.name, p.id, p.title, p.description, p.ingredients, p.directions, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, p.discount_id, d.buy_quantity, d.get_quantity, d.discount_type, d.discount
+LIMIT ? OFFSET ?;
 `;
-  return await db.query(query, [subcategoryId]);
+  return await db.query(query, [subcategoryId, limit, offset]);
+};
+
+const countProductsOfSubcategory = async (subcategoryId) => {
+  const sql = `
+  SELECT COUNT(*) AS total_count
+  FROM products
+  WHERE subcategory_id = ?;
+  `;
+  return await db.query(sql, [subcategoryId]);
 };
 
 const findProductsByStoreId = async (storeId) => {
@@ -663,7 +676,7 @@ const updateListItems = async (user_id, list_id, product_ids) => {
   );
 };
 
-const findListDetails = async (user_id, store_id) => {
+const findListDetails = async (user_id, store_id, limit, offset) => {
   let sql = `
   SELECT
     l.id AS list_id,
@@ -671,47 +684,82 @@ const findListDetails = async (user_id, store_id) => {
     l.user_id,
     l.title,
     l.description,
-    (SELECT pi.image FROM images pi WHERE pi.product_id=l.cover_photo_id LIMIT 1)AS list_cover_image,
-    li.product_id,
-    p.id AS product_id,
-    p.title AS product_title,
-    (SELECT pi.image FROM images pi WHERE p.id=pi.product_id LIMIT 1)AS product_image,
-    pq.quantity,
-    pq.quantity_varient,
-    pq.unit,
-    pq.actual_price,
-    pq.selling_price,
-    p.discount_id,
-    d.buy_quantity,
-    d.get_quantity,
-    d.discount_type,
-    d.discount,
+    (SELECT pi.image FROM images pi WHERE pi.id=l.cover_photo_id AND is_cover=1 LIMIT 1)AS list_cover_image,
     s.name AS store_name,
     s.logo AS store_logo
   FROM lists l
-  LEFT JOIN list_items li ON l.id=li.list_id
-  LEFT JOIN products p ON p.id=li.product_id
-  LEFT JOIN discounts d ON p.discount_id=d.id
-  LEFT JOIN product_quantity pq ON p.id=pq.product_id
   LEFT JOIN store s ON l.store_id = s.id
+  LEFT JOIN users u ON u.id=l.user_id
   WHERE l.user_id=?
   `;
 
-  const params=[user_id]
+  const params = [user_id];
 
-  if(store_id){
-    sql+=' AND l.store_id=?;'
+  if (store_id) {
+    sql += " AND l.store_id=? ";
     params.push(store_id);
   }
 
-  return await db.query(sql, params);
+  sql += " ORDER BY l.id LIMIT ? OFFSET ?";
+  params.push(limit, offset);
+
+  const [listDetails] = await db.query(sql, params);
+
+  let countSql = `
+  SELECT COUNT(DISTINCT l.id) AS totalLists
+  FROM lists l
+  WHERE l.user_id=?
+  `;
+  const countParams = [user_id];
+
+  if (store_id) {
+    countSql += " AND l.store_id=?";
+    countParams.push(store_id);
+  }
+
+  const [[{ totalLists }]] = await db.query(countSql, countParams);
+
+  if(listDetails.length==0){
+    return [listDetails, totalLists];
+  }
+
+  const listIds = listDetails.map((list) => list.list_id);
+  let productSql = `
+  SELECT
+  li.list_id,
+  p.id AS product_id,
+  p.title AS product_title,
+  (SELECT pi.image FROM images pi WHERE p.id=pi.product_id LIMIT 1) AS product_image,
+  pq.quantity,
+  pq.quantity_varient,
+  pq.unit,
+  pq.actual_price,
+  pq.selling_price,
+  p.discount_id,
+  d.buy_quantity,
+  d.get_quantity,
+  d.discount_type,
+  d.discount
+  FROM list_items li
+  LEFT JOIN products p ON p.id=li.product_id
+  LEFT JOIN discounts d ON p.discount_id=d.id
+  LEFT JOIN product_quantity pq ON p.id=pq.product_id
+  WHERE li.list_id IN (?)
+  `;
+  const [products] = await db.query(productSql, [listIds]);
+
+  listDetails.forEach(list => {
+    list.products = products.filter(product => product.list_id === list.list_id);
+  });
+
+  return [listDetails, totalLists];
 };
 
 const findCoverImagesOfList = async () => {
   return await db.query(`SELECT id,image FROM images WHERE is_cover=1;`);
 };
 
-const findGiftStores=async()=>{
+const findGiftStores = async () => {
   const sql = `
   SELECT DISTINCT s.id, s.name, s.logo
   FROM store s
@@ -732,15 +780,16 @@ const findGiftStores=async()=>{
     s.name,s.logo
 `;
   return await db.query(sql);
-}
+};
 
-const findGiftImages=async()=>{
-  return await db.query(`SELECT JSON_ARRAYAGG(i.image) AS gift_banners FROM images i WHERE is_gift=2`);
-}
-
+const findGiftImages = async () => {
+  return await db.query(
+    `SELECT JSON_ARRAYAGG(i.image) AS gift_banners FROM images i WHERE is_gift=2`
+  );
+};
 
 const getGiftProducts = async (store_id) => {
-  const sql=`
+  const sql = `
   SELECT 
     spc.id AS category_id,
     spc.name AS category_name,
@@ -786,9 +835,8 @@ const getGiftProducts = async (store_id) => {
     spc.id, spc.name, sps.id, sps.name, p.id, p.title, p.discount_id, pq.quantity, pq.quantity_varient, pq.unit, pq.actual_price, pq.selling_price, d.buy_quantity, d.get_quantity, d.discount_type, d.discount;
   `;
 
-  return await db.query(sql,[store_id])
+  return await db.query(sql, [store_id]);
 };
-
 
 module.exports = {
   getMainCategories,
@@ -824,5 +872,6 @@ module.exports = {
   getCategoryNames,
   findGiftStores,
   findGiftImages,
-  getGiftProducts
+  getGiftProducts,
+  countProductsOfSubcategory,
 };

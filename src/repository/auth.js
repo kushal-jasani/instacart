@@ -1,51 +1,43 @@
 const crypto = require("crypto");
-const db = require("../util/database");
+const db=require('../util/database');
 
-const findUser = async (key) => {
-  const keys = Object.keys(key);
-  const values = Object.values(key);
+const findUser=async(key)=>{
+    const keys = Object.keys(key);
+    const values = Object.values(key);
 
-  let sql = `SELECT * FROM users WHERE `;
-  sql += keys.map((key) => `${key} = ?`).join(" AND ");
+    let sql = `SELECT * FROM users WHERE `
+    sql += keys.map(key => `${key} = ?`).join(' AND ');
 
-  return await db.query(sql, values);
-};
+    return await db.query(sql, values);
+}
 
-const insertUser = async (
-  email,
-  country_code,
-  phoneno,
-  firstName,
-  lastName,
-  is_verify,
-  hashedPassword,
-  from_google
-) => {
-  return await db.query("INSERT INTO users SET ?", {
-    email,
+const insertUser=async(email,
     country_code,
     phoneno,
-    first_name: firstName,
-    last_name: lastName,
-    password: hashedPassword,
     is_verify,
-    from_google,
-  });
-};
+    hashedPassword)=>{
+    if(email){
+        const firstName = email.substring(0, email.indexOf('@'));
+        return await db.query('INSERT INTO users SET ?',{first_name:firstName,email:email,password:hashedPassword})
+    }
+    else{
+        return await db.query('INSERT INTO users SET ?',{country_code:country_code,phoneno:phoneno,is_verify:is_verify,password:hashedPassword})
+    }
+}
 
 const addTokenToUser = async (resettoken, resettokenexpiry, email) => {
-  return await db.query(
-    "update users set resettoken=?,resettokenexpiry=? where email=?",
-    [resettoken, resettokenexpiry, email]
-  );
-};
+    return await db.query(
+      "update users set resettoken=?,resettokenexpiry=? where email=?",
+      [resettoken, resettokenexpiry, email]
+    );
+  };
 
 const updatePasswordAndToken = async (hashedNewPassword, userId) => {
-  return await db.query(
-    "update users set password=?,resettoken=NULL where id=?",
-    [hashedNewPassword, userId]
-  );
-};
+    return await db.query(
+      "update users set password=?,resettoken=NULL where id=?",
+      [hashedNewPassword, userId]
+    );
+  };
 
 const generateToken = (length, expiryhours) => {
   return new Promise((resolve, reject) => {

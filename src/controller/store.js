@@ -43,6 +43,7 @@ const {
   findGiftStores,
   findGiftImages,
   getGiftProducts,
+  countProductsOfSubcategory,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -227,8 +228,8 @@ exports.getStoresByCategory = async (req, res, next) => {
 
 exports.getProductsForGiftsStore = async (req, res, next) => {
   try {
-    let {storeId} = req.query;
-  
+    let { storeId } = req.query;
+
     if (!storeId) {
       const [giftStores] = await findGiftStores();
       if (giftStores.length === 0) {
@@ -256,9 +257,9 @@ exports.getProductsForGiftsStore = async (req, res, next) => {
       Dessert: [],
     };
 
-    products.forEach(product => {
+    products.forEach((product) => {
       let formattedProduct;
-      if(product.product_id){
+      if (product.product_id) {
         formattedProduct = {
           id: product.product_id,
           title: product.product_title,
@@ -272,23 +273,36 @@ exports.getProductsForGiftsStore = async (req, res, next) => {
           ...(product.discount_id !== null && {
             discount_label: generateDiscountLabel(product),
           }),
-        };  
+        };
 
-      if (product.category_name.includes("Flowers") || product.subcategory_name.includes("Flowers")) {
-        productsByCategory.Flowers.push(formattedProduct);
-      }
-      if (product.category_name.includes("Wine") || product.subcategory_name.includes("Wine")) {
-        productsByCategory.Wine.push(formattedProduct);
-      }
-      if (product.category_name.includes("Champagne") || product.subcategory_name.includes("Champagne")) {
-        productsByCategory.Champagne.push(formattedProduct);
-      }
-      else if (product.category_name.includes("Chocolates") || product.subcategory_name.includes("Chocolates")) {
-        productsByCategory.Chocolates.push(formattedProduct);
-      }
-      else if (product.category_name.includes("Cake") || product.subcategory_name.includes("Cake")) {
-        productsByCategory.Dessert.push(formattedProduct);
-      }
+        if (
+          product.category_name.includes("Flowers") ||
+          product.subcategory_name.includes("Flowers")
+        ) {
+          productsByCategory.Flowers.push(formattedProduct);
+        }
+        if (
+          product.category_name.includes("Wine") ||
+          product.subcategory_name.includes("Wine")
+        ) {
+          productsByCategory.Wine.push(formattedProduct);
+        }
+        if (
+          product.category_name.includes("Champagne") ||
+          product.subcategory_name.includes("Champagne")
+        ) {
+          productsByCategory.Champagne.push(formattedProduct);
+        } else if (
+          product.category_name.includes("Chocolates") ||
+          product.subcategory_name.includes("Chocolates")
+        ) {
+          productsByCategory.Chocolates.push(formattedProduct);
+        } else if (
+          product.category_name.includes("Cake") ||
+          product.subcategory_name.includes("Cake")
+        ) {
+          productsByCategory.Dessert.push(formattedProduct);
+        }
       }
     });
 
@@ -299,7 +313,7 @@ exports.getProductsForGiftsStore = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: {store_id:storeId,productsByCategory},
+        data: { store_id: storeId, productsByCategory },
         msg: "Products retrieved successfully.",
       })
     );
@@ -442,7 +456,28 @@ exports.getStoreSubcategory = async (req, res, next) => {
       return acc;
     }, {});
 
-    const responseArray = Object.values(modifiedResponse);
+    // const responseArray = Object.values(modifiedResponse);
+
+    const responseArray = Object.values(modifiedResponse).map((subcategory) => {
+      const { page , limit } =
+        req.query[subcategory.subcategory_id] || {};
+
+      const pageInt = parseInt(page)||1;
+      const limitInt = parseInt(limit)||5;
+      const offset = (pageInt - 1) * limitInt;
+
+      const paginatedProducts = subcategory.products.slice(
+        offset,
+        offset + limitInt
+      );
+      return {
+        ...subcategory,
+        products: paginatedProducts,
+        total_count: subcategory.products.length,
+        current_page: pageInt,
+        total_pages: Math.ceil(subcategory.products.length / limitInt),
+      };
+    });
 
     return sendHttpResponse(
       req,
@@ -557,10 +592,23 @@ exports.getStoreDetailsInside = async (req, res, next) => {
 exports.getProductsFromSubCategory = async (req, res, next) => {
   try {
     const { subcategoryId } = req.params;
+    const { page,limit } = req.query;
+
+    const pageInt = parseInt(page, 10) || 1;
+    const limitInt = parseInt(limit, 10) || 5;
+    const offset = (pageInt - 1) * limitInt;
 
     const [subCategoryProducts] = await findProductsOfSubcategory(
+      subcategoryId,
+      limitInt,
+      offset
+    );
+
+    const [SubcategoryProductsCountresult] = await countProductsOfSubcategory(
       subcategoryId
     );
+    const totalCount = SubcategoryProductsCountresult[0].total_count;
+    const totalPages = Math.ceil(totalCount / limitInt);
 
     const subcategoryProductsList = subCategoryProducts[0]
       ? {
@@ -594,6 +642,10 @@ exports.getProductsFromSubCategory = async (req, res, next) => {
           }),
         };
       });
+
+      subcategoryProductsList.total_count = totalCount;
+      subcategoryProductsList.current_page = pageInt;
+      subcategoryProductsList.total_pages = totalPages;
     } else {
       subcategoryProductsList.products = ["no products found"];
     }
@@ -718,7 +770,19 @@ exports.getProductsByStoreId = async (req, res, next) => {
 
 exports.search = async (req, res, next) => {
   try {
-    const { query } = req.query;
+    const {
+      query,
+      storePage,
+      storeLimit,
+      productsStorePage,
+      productsStoreLimit,
+    } = req.query;
+
+    const storePageInt = parseInt(storePage, 10) || 1;
+    const storeLimitInt = parseInt(storeLimit, 10) || 5;
+    const productsStorePageInt = parseInt(productsStorePage, 10)||1;
+    const productsStoreLimitInt = parseInt(productsStoreLimit, 10)||2;
+
     const stores = await findStoresByName(query);
     const products = await findProductsByTitle(query);
 
@@ -745,20 +809,35 @@ exports.search = async (req, res, next) => {
       storeIdsWithMatchingProducts
     );
 
-    const matchingStores = stores;
-    const matchingProducts = storesWithMatchingProducts.map((store) => ({
-      store_id: store.id,
-      store_name: store.name,
-      store_logo: store.logo,
-      products: products
-        .filter((product) => product.store_id === store.id)
-        .map((product) => ({
-          id: product.id,
-          title: product.title,
-          image: product.image,
-        })),
-      total_products: products.length,
-    }));
+    const totalMatchingStores = stores.length;
+    const storeOffset = (storePageInt - 1) * storeLimitInt;
+    const paginatedMatchingStores = stores.slice(storeOffset, storeOffset + storeLimitInt);
+
+
+    const totalStoresWithMatchingProducts = storesWithMatchingProducts.length;
+    const productsStoreOffset = (productsStorePageInt - 1) * productsStoreLimitInt;
+    const paginatedStoresWithMatchingProducts = storesWithMatchingProducts.slice(productsStoreOffset, productsStoreOffset + productsStoreLimitInt);
+
+    const matchingProducts = paginatedStoresWithMatchingProducts.map((store) => {
+      const storeProducts = products.filter(
+        (product) => product.store_id === store.id
+      );
+      const totalProducts = storeProducts.length;
+    
+      return {
+        store_id: store.id,
+        store_name: store.name,
+        store_logo: store.logo,
+        products: storeProducts
+          .filter((product) => product.store_id === store.id)
+          .map((product) => ({
+            id: product.id,
+            title: product.title,
+            image: product.image,
+          })),
+        total_products: totalProducts,
+      };
+    });
 
     return sendHttpResponse(
       req,
@@ -767,7 +846,16 @@ exports.search = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: { matchingStores, matchingProducts },
+        data: {
+          matchingStores: paginatedMatchingStores,
+          total_matching_stores: totalMatchingStores,
+          current_matching_store_page: storePageInt,
+          total_matching_store_pages: Math.ceil(totalMatchingStores / storeLimitInt),
+          matchingProducts,
+          total_stores_with_matching_products: totalStoresWithMatchingProducts,
+          current_store_page: productsStorePageInt,
+          total_store_pages: Math.ceil(totalStoresWithMatchingProducts / productsStoreLimitInt),
+        },
         msg: "Products and Store Data fetched for given search✅",
       })
     );
@@ -788,8 +876,11 @@ exports.search = async (req, res, next) => {
 
 exports.searchInsideStore = async (req, res, next) => {
   try {
-    const { storeId, query } = req.query;
+    const { storeId, query,page,limit } = req.query;
     const products = await findProductsByTitleAndStoreId(query, storeId);
+
+    const pageInt=parseInt(page,10)||1;
+    const limitInt=parseInt(limit,10)||8;
 
     if (!products || products.length == 0) {
       return sendHttpResponse(
@@ -804,7 +895,12 @@ exports.searchInsideStore = async (req, res, next) => {
       );
     }
 
-    const response = products.map((product) => ({
+    const totalProducts=products.length;
+    const offset=(pageInt-1)*limitInt;
+
+    const paginatedProducts=products.slice(offset,offset+limitInt);
+
+    const response = paginatedProducts.map((product) => ({
       id: product.product_id,
       title: product.product_title,
       image: product.product_image,
@@ -826,7 +922,12 @@ exports.searchInsideStore = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: response,
+        data: {
+          products:response,
+          total_products:totalProducts,
+          current_page:pageInt,
+          total_pages:Math.ceil(totalProducts/limitInt)
+        },
         msg: "Products Data fetched for given search✅",
       })
     );
@@ -1198,9 +1299,13 @@ exports.editListItems = async (req, res, next) => {
 exports.getList = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { storeId } = req.query;
+    const { storeId ,page,limit} = req.query;
 
-    const [listDetails] = await findListDetails(userId, storeId);
+    const pageInt = parseInt(page, 10) || 1;
+    const limitInt = parseInt(limit, 10) || 4;
+    const offset = (pageInt - 1) * limitInt;
+
+    const [listDetails,totalListCount] = await findListDetails(userId, storeId,limitInt,offset);
 
     if (!listDetails || listDetails.length == 0) {
       return sendHttpResponse(
@@ -1231,48 +1336,77 @@ exports.getList = async (req, res, next) => {
       }
     });
 
-    const result = listDetails.reduce((acc, item) => {
-      const listIndex = acc.findIndex((list) => list.list_id === item.list_id);
-      if (listIndex === -1) {
-        acc.push({
-          list_id: item.list_id,
-          store_id: item.store_id,
-          store_name: item.store_name,
-          store_logo: item.store_logo,
-          next_delivery_time: deliveryTimes[item.store_id] || null,
-          user_id: item.user_id,
-          user_name: item.last_name
-            ? `${item.first_name} ${item.last_name}`
-            : item.first_name,
-          title: item.title,
-          description: item.description,
-          cover_image_url: item.list_cover_image,
-          products: [],
-        });
-      }
+    // const result = listDetails.reduce((acc, item) => {
+    //   const listIndex = acc.findIndex((list) => list.list_id === item.list_id);
+    //   if (listIndex === -1) {
+    //     acc.push({
+    //       list_id: item.list_id,
+    //       store_id: item.store_id,
+    //       store_name: item.store_name,
+    //       store_logo: item.store_logo,
+    //       next_delivery_time: deliveryTimes[item.store_id] || null,
+    //       user_id: item.user_id,
+    //       user_name: item.last_name
+    //         ? `${item.first_name} ${item.last_name}`
+    //         : item.first_name,
+    //       title: item.title,
+    //       description: item.description,
+    //       cover_image_url: item.list_cover_image,
+    //       products: [],
+    //     });
+    //   }
+    //   console.log(item)
 
-      if (item.product_id) {
-        const product = {
-          id: item.product_id,
-          title: item.product_title,
-          image: item.product_image,
-          label:
-            item.quantity === 1
-              ? `${item.quantity_varient} ${item.unit}`
-              : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
-          actual_price: item.actual_price,
-          selling_price: item.selling_price,
-          ...(item.discount_id !== null && {
-            discount_label: generateDiscountLabel(item),
+    //   if (item.product_id) {
+    //     console.log("eee",item)
+    //     const product = {
+    //       id: item.product_id,
+    //       title: item.product_title,
+    //       image: item.product_image,
+    //       label:
+    //         item.quantity === 1
+    //           ? `${item.quantity_varient} ${item.unit}`
+    //           : `${item.quantity} × ${item.quantity_varient} ${item.unit}`,
+    //       actual_price: item.actual_price,
+    //       selling_price: item.selling_price,
+    //       ...(item.discount_id !== null && {
+    //         discount_label: generateDiscountLabel(item),
+    //       }),
+    //     };
+
+    //     acc[
+    //       acc.findIndex((list) => list.list_id === item.list_id)
+    //     ].products.push(product);
+    //   }
+    //   return acc;
+    // }, []);
+
+  
+    const result = listDetails.map((list) => {
+      return {
+        list_id: list.list_id,
+        store_id: list.store_id,
+        store_name: list.store_name,
+        store_logo: list.store_logo,
+        next_delivery_time: deliveryTimes[list.store_id] || null,
+        user_id: list.user_id,
+        user_name: list.last_name ? `${list.first_name} ${list.last_name}` : list.first_name,
+        title: list.title,
+        description: list.description,
+        cover_image_url: list.list_cover_image,
+        products: list.products.map(product => ({
+          id: product.product_id,
+          title: product.product_title,
+          image: product.product_image,
+          label: product.quantity === 1 ? `${product.quantity_varient} ${product.unit}` : `${product.quantity} × ${product.quantity_varient} ${product.unit}`,
+          actual_price: product.actual_price,
+          selling_price: product.selling_price,
+          ...(product.discount_id !== null && {
+            discount_label: generateDiscountLabel(product),
           }),
-        };
-
-        acc[
-          acc.findIndex((list) => list.list_id === item.list_id)
-        ].products.push(product);
-      }
-      return acc;
-    }, []);
+        })),
+      };
+    });
 
     return sendHttpResponse(
       req,
@@ -1281,7 +1415,12 @@ exports.getList = async (req, res, next) => {
       generateResponse({
         status: "success",
         statusCode: 200,
-        data: result,
+        data: {
+          lists:result,
+          total_lists:totalListCount,
+          current_page:pageInt,
+          total_pages:Math.ceil(totalListCount/limitInt)
+        },
         msg: "List details fetched successfully",
       })
     );
