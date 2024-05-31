@@ -373,13 +373,13 @@ const findReferralByCode = async(code) => {
 };
 
 const updateReferralBonus = async(userId, amount) => {
-  const sql = 'UPDATE referrals SET earned_amt = earned_amt + ? WHERE user_id = ?';
-  return await db.query(sql, [amount, userId]);
+  const sql = 'UPDATE referrals SET earned_amt = earned_amt + ?,total_amt = total_amt + ? WHERE user_id = ?';
+  return await db.query(sql, [amount,amount,userId]);
 };
 
 const getReferralAmount = async(userId) => {
-  const query = 'SELECT earned_amt FROM referrals WHERE user_id = ?';
-  return await db.query(query, [userId]);
+  const sql = 'SELECT earned_amt FROM referrals WHERE user_id = ?';
+  return await db.query(sql, [userId]);
 };
 
 const deductReferralAmount = async(userId, usedAmt) => {
