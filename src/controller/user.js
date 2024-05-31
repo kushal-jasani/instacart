@@ -5,6 +5,7 @@ const { generateResponse, sendHttpResponse } = require("../helper/response");
 const { findUser } = require("../repository/auth");
 const { findPasswordOfUser, updateUser } = require("../repository/user");
 const { changeEmailSchema, changePasswordSchema, changeNameSchema, changePhoneNumberSchema } = require('../validator/user_section_schema');
+const { findReferralInfo } = require("../repository/user");
 const clientId = process.env.OTPLESS_CLIENTID;
 const clientSecret = process.env.OTPLESS_CLIETSECRET;
 
@@ -428,6 +429,7 @@ exports.userInformation = async (req, res, next) => {
 
     const userId = req.user.userId;
     const [userResults] = await findUser({ id: userId });
+    const [referralInfo]=await findReferralInfo(userId);
     if (!userResults || userResults.length == 0) {
       return sendHttpResponse(
         req,
@@ -442,6 +444,7 @@ exports.userInformation = async (req, res, next) => {
     }
     const { first_name, last_name, email, country_code, phoneno, is_verify } =
       userResults[0];
+    const {code,total_amt,remaining_amt}=referralInfo[0];
 
     const userData = {
       email: email,
@@ -449,6 +452,9 @@ exports.userInformation = async (req, res, next) => {
       lastName: last_name,
       country_code: country_code,
       phoneno: phoneno,
+      referral_code:code,
+      total_earned_amt:total_amt,
+      remaining_amt:remaining_amt
     };
 
     if(phoneno){
