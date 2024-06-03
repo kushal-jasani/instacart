@@ -49,18 +49,34 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
     }
     const id = req.user.insertId ? req.user.insertId : req.user[0].id;
 
+    const redirectUrl = process.env.NODE_ENV === 'production'
+      ? process.env.REDIRECT_LIVE
+      : process.env.REDIRECT_LOCAL;
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
     const htmlWithEmbeddedJWT = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Redirecting</title>
+    </head>
+    <body>
     <html>
       <script>
+      console.log('Script loaded');
         // Save JWT to localStorage
-        window.localStorage.setItem('accessToken','${accessToken}');
-        window.localStorage.setItem('refreshToken','${refreshToken}');
+        window.localStorage.setItem('accessToken', '${accessToken}');
+        console.log('AccessToken set:', window.localStorage.getItem('accessToken'));
+
+        window.localStorage.setItem('refreshToken', '${refreshToken}');
+        window.localStorage.setItem('12344556',1234456566);
 
         // Redirect browser to root of application
-        window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
+        window.location.href = '${redirectUrl}';
       </script>
+      </body>
     </html>
     `;
 
