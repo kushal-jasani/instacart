@@ -49,53 +49,52 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
     }
     const id = req.user.insertId ? req.user.insertId : req.user[0].id;
 
-    const redirectUrl = process.env.NODE_ENV === 'production'
-      ? process.env.REDIRECT_LIVE
-      : process.env.REDIRECT_LOCAL;
+    // const redirectUrl = process.env.NODE_ENV === 'production'
+    //   ? process.env.REDIRECT_LIVE
+    //   : process.env.REDIRECT_LOCAL;
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
-    const htmlWithEmbeddedJWT = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Redirecting</title>
-    </head>
-    <body>
-    <html>
-      <script>
-      try{
-      console.log('Current origin>>>>>:  ', window.location.origin);
+    // const htmlWithEmbeddedJWT = `
+    // <!DOCTYPE html>
+    // <html lang="en">
+    // <head>
+    //   <meta charset="UTF-8">
+    //   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    //   <title>Redirecting</title>
+    // </head>
+    // <body>
+    // <html>
+    //   <script>
+    //   try{
+    //   console.log('Current origin>>>>>:  ', window.location.origin);
 
-        // Save JWT to localStorage
-        window.localStorage.setItem('accessToken', '${accessToken}');
-        console.log('AccessToken set:', window.localStorage.getItem('accessToken'));
+    //     // Save JWT to localStorage
+    //     window.localStorage.setItem('accessToken', '${accessToken}');
+    //     console.log('AccessToken set:', window.localStorage.getItem('accessToken'));
 
-        window.localStorage.setItem('refreshToken', '${refreshToken}');
-        window.localStorage.setItem('12344556',1234456566);
+    //     window.localStorage.setItem('refreshToken', '${refreshToken}');
 
-        // Redirect browser to root of application
-        window.location.href = '${redirectUrl}';
-      }
-      catch{
-        console.error('Error setting local storage:', error);
-      }
-      </script>
-      </body>
-    </html>
-    `;
+    //     // Redirect browser to root of application
+    //     window.location.href = '${redirectUrl}';
+    //   }
+    //   catch{
+    //     console.error('Error setting local storage:', error);
+    //   }
+    //   </script>
+    //   </body>
+    // </html>
+    // `;
 
-    // res.cookie("accessToken", accessToken);
+    res.cookie("accessToken", accessToken);
     // console.log(htmlWithEmbeddedJWT)
-    res.send(htmlWithEmbeddedJWT)
-    // res.cookie("refreshToken", refreshToken);
-    // const url = `${
-    //   process.env.NODE_ENV === "production"
-    //     ? process.env.REDIRECT_LIVE
-    //     : process.env.REDIRECT_LOCAL
-    // }`;
-    // res.redirect(url);
+    // res.send(htmlWithEmbeddedJWT)
+    res.cookie("refreshToken", refreshToken);
+    const url = `${
+      process.env.NODE_ENV === "production"
+        ? process.env.REDIRECT_LIVE
+        : process.env.REDIRECT_LOCAL
+    }`;
+    res.redirect(url);
   } catch (error) {
     console.log("Error in loginOrRegisterWithGoogle", error);
     return sendHttpResponse(
