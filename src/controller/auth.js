@@ -51,29 +51,29 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
 
     const accessToken = generateAccessToken(id);
     const refreshToken = generateRefreshToken(id);
-    // const htmlWithEmbeddedJWT = `
-    // <html>
-    //   <script>
-    //     // Save JWT to localStorage
-    //     window.localStorage.setItem('accessToken','${accessToken}');
-    //     window.localStorage.setItem('refreshToken','${refreshToken}');
+    const htmlWithEmbeddedJWT = `
+    <html>
+      <script>
+        // Save JWT to localStorage
+        window.localStorage.setItem('accessToken','${accessToken}');
+        window.localStorage.setItem('refreshToken','${refreshToken}');
 
-    //     // Redirect browser to root of application
-    //     window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
-    //   </script>
-    // </html>
-    // `;
+        // Redirect browser to root of application
+        window.location.href = ${process.env.NODE_ENV==='production' ? " ' " + process.env.REDIRECT_LIVE + " ' " : " ' " + process.env.REDIRECT_LOCAL + " ' "};
+      </script>
+    </html>
+    `;
 
-    res.cookie("accessToken", accessToken);
+    // res.cookie("accessToken", accessToken);
     // console.log(htmlWithEmbeddedJWT)
-    // res.send(htmlWithEmbeddedJWT)
-    res.cookie("refreshToken", refreshToken);
-    const url = `${
-      process.env.NODE_ENV === "production"
-        ? process.env.REDIRECT_LIVE
-        : process.env.REDIRECT_LOCAL
-    }`;
-    res.redirect(url);
+    res.send(htmlWithEmbeddedJWT)
+    // res.cookie("refreshToken", refreshToken);
+    // const url = `${
+    //   process.env.NODE_ENV === "production"
+    //     ? process.env.REDIRECT_LIVE
+    //     : process.env.REDIRECT_LOCAL
+    // }`;
+    // res.redirect(url);
   } catch (error) {
     console.log("Error in loginOrRegisterWithGoogle", error);
     return sendHttpResponse(
