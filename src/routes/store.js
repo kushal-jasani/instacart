@@ -32,5 +32,7 @@ router.get("/lists/cover-images", storeController.getListCoverImages);
 router.get("/lists/list-details", isAuth, storeController.getList);
 
 router.post("/lists/:listId/edit", isAuth, storeController.editList);
+router.delete("/lists/:listId/delete", isAuth, storeController.deleteList);
+
 
 module.exports = router;
