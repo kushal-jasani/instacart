@@ -65,7 +65,9 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
     <body>
     <html>
       <script>
-      console.log('Script loaded');
+      try{
+      console.log('Current origin>>>>>:  ', window.location.origin);
+
         // Save JWT to localStorage
         window.localStorage.setItem('accessToken', '${accessToken}');
         console.log('AccessToken set:', window.localStorage.getItem('accessToken'));
@@ -75,6 +77,10 @@ exports.loginOrRegisterWithGoogle = async (req, res, next) => {
 
         // Redirect browser to root of application
         window.location.href = '${redirectUrl}';
+      }
+      catch{
+        console.error('Error setting local storage:', error);
+      }
       </script>
       </body>
     </html>
