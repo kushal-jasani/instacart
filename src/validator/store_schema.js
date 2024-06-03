@@ -23,4 +23,8 @@ const editListItemsSchema = Joi.object({
     product_ids: Joi.array().items(Joi.number().integer()).required(),
   });
 
-module.exports={addListSchema,addListItemsSchema,editListSchema,editListItemsSchema}
+const deleteListSchema = Joi.object({
+    listId: Joi.number().required()
+});
+
+module.exports={addListSchema,addListItemsSchema,editListSchema,editListItemsSchema,deleteListSchema}

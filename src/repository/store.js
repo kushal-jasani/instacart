@@ -679,6 +679,13 @@ const updateListItems = async (user_id, list_id, product_ids) => {
   );
 };
 
+const deleteList = async (user_id, list_id) => {
+  return await db.query("DELETE FROM lists WHERE id=? AND user_id=?", [
+    list_id,
+    user_id,
+  ]);
+};
+
 const findListDetails = async (user_id, store_id, limit, offset) => {
   let sql = `
   SELECT
@@ -724,7 +731,7 @@ const findListDetails = async (user_id, store_id, limit, offset) => {
 
   const [[{ totalLists }]] = await db.query(countSql, countParams);
 
-  if(listDetails.length==0){
+  if (listDetails.length == 0) {
     return [listDetails, totalLists];
   }
 
@@ -753,8 +760,10 @@ const findListDetails = async (user_id, store_id, limit, offset) => {
   `;
   const [products] = await db.query(productSql, [listIds]);
 
-  listDetails.forEach(list => {
-    list.products = products.filter(product => product.list_id === list.list_id);
+  listDetails.forEach((list) => {
+    list.products = products.filter(
+      (product) => product.list_id === list.list_id
+    );
   });
 
   return [listDetails, totalLists];
@@ -868,6 +877,7 @@ module.exports = {
   findProductsByStoreId,
   generateDiscountLabel,
   createList,
+  deleteList,
   updateListDetails,
   insertListItems,
   updateListItems,

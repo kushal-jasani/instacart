@@ -4,6 +4,7 @@ const {
   editListSchema,
   addListItemsSchema,
   addListSchema,
+  deleteListSchema,
 } = require("../validator/store_schema");
 const {
   getMainCategories,
@@ -41,6 +42,7 @@ const {
   findGiftImages,
   getGiftProducts,
   countProductsOfSubcategory,
+  deleteList,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -1052,6 +1054,66 @@ exports.addList = async (req, res, next) => {
   }
 };
 
+exports.deleteList=async(req,res,next)=>{
+  try{
+    const userId=req.user.userId;
+    const {listId}=req.params;
+
+    const { error } = deleteListSchema.validate({ listId });
+    if (error) {
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 400,
+          msg: `Validation error: ${error.details[0].message}⚠️`,
+        })
+      );
+    }
+
+    const [deleteResults]=await deleteList(userId,listId);
+
+    if(deleteResults.affectedRows==0){
+      return sendHttpResponse(
+        req,
+        res,
+        next,
+        generateResponse({
+          status: "error",
+          statusCode: 404,
+          msg: "List not found or user not authorized☹️",
+        })
+      );
+    }
+
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "success",
+        statusCode: 200,
+        msg: "List Deleted successfully✅",
+      })
+    );
+  }
+  catch(error){
+    console.log("Error while deleting list: ", error);
+    return sendHttpResponse(
+      req,
+      res,
+      next,
+      generateResponse({
+        status: "error",
+        statusCode: 500,
+        msg: "Internal server error while deleting list👨🏻‍🔧",
+      })
+    );
+  }
+}
+
 exports.editList = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -1086,7 +1148,6 @@ exports.editList = async (req, res, next) => {
       updatedFields.cover_photo_id = cover_photo_id;
     }
 
-    console.log(updatedFields);
     if (Object.keys(updatedFields).length == 0) {
       return sendHttpResponse(
         req,
