@@ -1360,13 +1360,13 @@ exports.editListItems = async (req, res, next) => {
 exports.getList = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { storeId ,page,limit} = req.query;
+    const { storeId,listId,page,limit} = req.query;
 
     const pageInt = parseInt(page, 10) || 1;
     const limitInt = parseInt(limit, 10) || 4;
     const offset = (pageInt - 1) * limitInt;
 
-    const [listDetails,totalListCount] = await findListDetails(userId, storeId,limitInt,offset);
+    const [listDetails,totalListCount] = await findListDetails(userId, storeId,listId,limitInt,offset);
 
     if (!listDetails || listDetails.length == 0) {
       return sendHttpResponse(
