@@ -686,7 +686,7 @@ const deleteList = async (user_id, list_id) => {
   ]);
 };
 
-const findListDetails = async (user_id, store_id, limit, offset) => {
+const findListDetails = async (user_id, store_id,list_id,limit, offset) => {
   let sql = `
   SELECT
     l.id AS list_id,
@@ -712,6 +712,11 @@ const findListDetails = async (user_id, store_id, limit, offset) => {
     params.push(store_id);
   }
 
+  if (list_id) {
+    sql += " AND l.id=?";
+    params.push(list_id);
+  }
+
   sql += " ORDER BY l.id LIMIT ? OFFSET ?";
   params.push(limit, offset);
 
@@ -727,6 +732,11 @@ const findListDetails = async (user_id, store_id, limit, offset) => {
   if (store_id) {
     countSql += " AND l.store_id=?";
     countParams.push(store_id);
+  }
+
+  if (list_id) {
+    countSql += " AND l.id=?";
+    countParams.push(list_id);
   }
 
   const [[{ totalLists }]] = await db.query(countSql, countParams);
