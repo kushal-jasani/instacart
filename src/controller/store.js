@@ -46,7 +46,6 @@ const {
   getGiftProducts,
   countProductsOfSubcategory,
   deleteList,
-  getExistingListItems,
 } = require("../repository/store");
 
 exports.categoryFilter = async (req, res, next) => {
@@ -1228,31 +1227,10 @@ exports.addListItems = async (req, res, next) => {
     }
 
     try {
-
-      const existingItems = await getExistingListItems(list_id);
-
-      const newProductIds = product_ids.filter(
-        (productId) => !existingItems.includes(productId)
-      );
-
-      if (newProductIds.length === 0) {
-        return sendHttpResponse(
-          req,
-          res,
-          next,
-          generateResponse({
-            status: "error",
-            statusCode: 400,
-            msg: "No new items to add. All items already exist in the list.",
-          })
-        );
-      }
-
-
       const [listResults] = await insertListItems(
         user_id,
         list_id,
-        newProductIds
+        product_ids
       );
 
       if (!listResults || listResults.length == 0) {
