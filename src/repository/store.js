@@ -662,6 +662,16 @@ const insertListItems = async (user_id, list_id, product_ids) => {
   return await db.query(sql, values);
 };
 
+const getExistingListItems=async(list_id)=> {
+    const sql = `
+      SELECT product_id
+      FROM list_items
+      WHERE list_id = ?
+    `;
+    const [results] = await db.query(sql, [list_id]);
+    return results.map(item => item.product_id);
+}
+
 const updateListItems = async (user_id, list_id, product_ids) => {
   if (product_ids.length == 0) return;
 
@@ -899,4 +909,5 @@ module.exports = {
   findGiftImages,
   getGiftProducts,
   countProductsOfSubcategory,
+  getExistingListItems
 };
