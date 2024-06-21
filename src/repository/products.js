@@ -6,6 +6,8 @@ const findProductDetail=async(productId,userId)=>{
     let query=`
     SELECT 
                 p.id AS product_id,
+                p.category_id AS category_id,
+                p.subcategory_id AS subcategory_id,
                 p.title AS product_title,
                 p.description AS product_description,
                 p.ingredients AS product_ingredients,

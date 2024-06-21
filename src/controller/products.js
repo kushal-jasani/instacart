@@ -34,6 +34,8 @@ exports.getProductDetail = async (req, res, next) => {
 
     const responseObject = {
       product_id: product.product_id,
+      category_id : product.category_id,
+      subcategory_id : product.subcategory_id,
       product_title: product.product_title,
       product_description: product.product_description,
       product_ingredients: product.product_ingredients,
