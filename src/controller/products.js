@@ -33,14 +33,14 @@ exports.getProductDetail = async (req, res, next) => {
     const product = productResults[0];
 
     const responseObject = {
-      product_id: product.product_id,
+      id: product.product_id,
       category_id : product.category_id,
       subcategory_id : product.subcategory_id,
-      product_title: product.product_title,
+      title: product.product_title,
       product_description: product.product_description,
       product_ingredients: product.product_ingredients,
       product_directions: product.product_directions,
-      product_images: product.product_images,
+      image: product.product_images,
       label:
         product.quantity === 1
           ? `${product.quantity_varient} ${product.unit}`
